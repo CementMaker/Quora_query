@@ -6,11 +6,16 @@ import statistics
 
 import numpy as np
 import pandas as pd
+import datetime
 import matplotlib.pyplot as plt
 
 from collections import Counter
 from tensorflow.contrib import learn
 from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 path = os.getcwd()
 
@@ -93,42 +98,42 @@ def pre_split_train():
     print("写入csv数据成功！！！")
 
 
+def remove_stop_words(sentence, stop_words_set):
+    ans = []
+    for word in sentence.split():
+        if word.lower() not in stop_words_set:
+            ans.append(word)
+
+    return " ".join(ans)
+
+
 class data(object):
-    def __init__(self, train_file_path, test_file_path):
+    def __init__(self, train_file_path, test_file_path, stop_words_file):
 
         # 获取训练数据，数据来源于 train_file_path
         self.df = pd.read_csv(train_file_path).dropna()
         self.path = os.path.dirname(__file__)
         self.columns = ['question1', 'question2', 'is_duplicate']
+        self.stop_words = set(open(stop_words_file, "r").read().split())
 
-        # 兑换句子，构造新数据
-        # self.df = pd.concat([pd.DataFrame(data={"question1": self.df["question2"],
-        #                                         "question2": self.df["question1"],
-        #                                         "is_duplicate": self.df["is_duplicate"]},
-        #                                   columns=["question1", "question2", 'is_duplicate']),
-        #                      self.df], axis=0, ignore_index=True)
-
+        number = 0
+        print(datetime.datetime.now().isoformat())
         self.data = self.df[['question1', 'question2']].values
-        self.label = self.df[['is_duplicate']].values
+        # for index in range(len(self.data)):
+        #     sentencea, sentenceb = self.data[index]
+        #     self.data[index][0] = remove_stop_words(sentencea, self.stop_words)
+        #     self.data[index][1] = remove_stop_words(sentenceb, self.stop_words)
+        #
+        #     number += 1
+        #     if number % 10000 == 0:
+        #         print("number :", number, datetime.datetime.now().isoformat())
+        #         print(self.data[index][0], self.data[index][1])
 
-        # data_double, label_double = [], []
-        # for (d, l) in zip(self.data, self.label):
-        #     if l == 0 and random.random() <= 0.5667:
-        #         data_double.append(d)
-        #         label_double.append(l)
-        # self.data = np.append(self.data, data_double, axis=0)
-        # self.label = np.append(self.label, label_double)
+        self.label = self.df[['is_duplicate']].values
 
         print("当前文件路径 :", self.path)
         print("self.data.shape :", self.data.shape)
         print("self.label.shape :", self.label.shape)
-
-        # 获取测试数据，数据来源于 test_file_path
-        # self.test_df = pd.concat(objs=[pd.DataFrame(data={"question1": self.test_df["question2"],
-        #                                                   "question2": self.test_df["question1"],
-        #                                                   "is_duplicate": self.test_df["is_duplicate"]},
-        #                                             columns=["question1", "question2", 'is_duplicate']),self.test_df],
-        #                          axis=0, ignore_index=True)
 
         self.test_df = pd.read_csv(test_file_path).dropna()
         self.test_data = self.test_df[['question1', 'question2']].values
@@ -136,6 +141,7 @@ class data(object):
 
         print("self.test_data.shape :", self.test_data.shape)
         print("self.test_label.shape :", self.test_label.shape)
+
 
     @staticmethod
     def text_to_wordlist(text):
@@ -204,7 +210,7 @@ class data(object):
             self.data = [self.text_to_wordlist(line) for line in self.data]
             self.test_data = [self.text_to_wordlist(line) for line in self.test_data]
 
-            vocab_processor = learn.preprocessing.VocabularyProcessor(60, min_frequency=5)
+            vocab_processor = learn.preprocessing.VocabularyProcessor(50, min_frequency=5)
             vocab_processor = vocab_processor.fit(x_text)
             print("vocab_processor 训练结束")
 
@@ -247,6 +253,7 @@ class data(object):
     @staticmethod
     def magic_feature():
         pass
+
 
 
 class data_create(object):
@@ -402,9 +409,16 @@ class data_create(object):
 
 
 if __name__ == '__main__':
-    pre_split_train()
+    # pre_split_train()
     data_file = "./data/csv/train.csv"
     train_file = "./data/csv/train_train.csv"
     test_file = "./data/csv/train_test.csv"
-    Data = data(train_file, test_file).get_one_hot()
+    stop_words_file = "./data/stop_words_eng.txt"
+
+    # Data = data(train_file, test_file, stop_words_file)
+    Data = data(train_file, test_file, stop_words_file).get_one_hot()
+
+    # ManualFeatureExtraction(data_file, train_file, test_file)
+    # feature = ManualFeatureExtraction(data_file)
+    # feature.main()
 

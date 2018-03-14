@@ -56,7 +56,7 @@ class siamese_network_cnn(object):
     def __init__(self):
         # 定义CNN网络，对话窗口以及optimizer
         self.sess = tf.Session()
-        self.cnn = Cnn(sequence_length=60,
+        self.cnn = Cnn(sequence_length=50,
                        vocab_size=73300,
                        embedding_size=128,
                        filter_sizes=[1, 2, 3, 4, 5, 6],
@@ -70,9 +70,10 @@ class siamese_network_cnn(object):
         self.data_file = os.path.join(os.path.dirname(__file__), "../data/csv/train.csv")
         self.train_file = os.path.join(os.path.dirname(__file__), "../data/csv/train_train.csv")
         self.test_file = os.path.join(os.path.dirname(__file__), "../data/csv/train_test.csv")
+        self.stop_words_file = "../data/stop_words_eng.txt"
 
         # self.data_create = data_create(self.data_file).get_one_hot()
-        self.data_create = data(self.train_file, self.test_file).get_one_hot()
+        self.data_create = data(self.train_file, self.test_file, self.stop_words_file).get_one_hot()
         self.train_data, self.train_label = self.data_create.vec_train, self.data_create.label
         self.test_data, self.test_label = self.data_create.vec_test, self.data_create.test_label
 
