@@ -6,11 +6,16 @@ import statistics
 
 import numpy as np
 import pandas as pd
+import datetime
 import matplotlib.pyplot as plt
 
 from collections import Counter
 from tensorflow.contrib import learn
 from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 path = os.getcwd()
 
@@ -93,42 +98,134 @@ def pre_split_train():
     print("写入csv数据成功！！！")
 
 
+def remove_stop_words(sentence, stop_words_set):
+    ans = []
+    for word in sentence.split():
+        if word.lower() not in stop_words_set:
+            ans.append(word)
+
+    return " ".join(ans)
+
+
+class ManualFeatureExtraction(object):
+    def __init__(self, data_file):
+        self.df = pd.read_csv(data_file).dropna()[['question1', 'question2']]
+        self.corpus = np.reshape(a=self.df.values,
+                                 newshape=len(self.df.values) * 2)
+        print(self.corpus.shape)
+        self.vectorizer = TfidfVectorizer(
+            max_df=0.5,
+            max_features=5000,
+            min_df=1,
+            use_idf=True,
+            lowercase=False,
+            decode_error='ignore',
+        ).fit(self.corpus)
+        self.train_document = self.df.values
+
+
+    def tf_idf_word_match(self, sentencea, sentenceb):
+        sentencea = sentencea.split()
+        sentenceb = sentenceb.split()
+        match = set(sentencea) & set(sentenceb)
+        combine = set(sentencea) | set(sentenceb)
+
+        if(len(match) == 0): return 0.
+        tf_idf_a = self.vectorizer.transform(match).toarray()[0]
+        tf_idf_b = self.vectorizer.transform(combine).toarray()[0]
+        return sum(tf_idf_a) / sum(tf_idf_b)
+
+    def sentiment(self, sentence):
+        pass
+
+    @staticmethod
+    def length_difference(sentencea, sentenceb):
+        return len(sentencea) - len(sentenceb), len(sentencea.split()) - len(sentenceb.split())
+
+    @staticmethod
+    def LongCommonSequence(sentencea, sentenceb):
+        sentencea = sentencea.split()
+        sentenceb = sentenceb.split()
+        lena, lenb = len(sentencea), len(sentenceb)
+        dp = np.array([[0] * (lena + 1) for _ in range(lenb + 1)])
+
+        for i in range(lena):
+            for j in range(lenb):
+                if sentencea[i] == sentenceb[j]:
+                    dp[i + 1][j + 1] = dp[i][j] + 1
+                else:
+                    dp[i + 1][j + 1] = max(dp[i + 1][j], dp[i][j + 1])
+
+        return dp[lena][lenb]
+
+    @staticmethod
+    def edit_distance_word(sentencea, sentenceb):
+        sentencea = sentencea.split()
+        sentenceb = sentenceb.split()
+        print(sentencea)
+        print(sentenceb)
+        lena, lenb = len(sentencea), len(sentenceb)
+        dp = [[0] * (lenb + 1) for _ in range(lena + 1)]
+
+        # 长度为i句子变换成长度为0的句子的编辑距离
+        # 下标为i，子列表的长度为i + 1,所以有 dp[i + 1][0] = i + 1
+        for i in range(lena + 1): dp[i][0] = i
+        for j in range(lenb + 1): dp[0][j] = j
+
+        for i in range(lena):
+            for j in range(lenb):
+                if sentencea[i] == sentenceb[j]:
+                    dp[i + 1][j + 1] = dp[i][j]
+                else:
+                    dp[i + 1][j + 1] = min(dp[i + 1][j], dp[i][j + 1], dp[i][j]) + 1
+            #     print(sentencea[0 : i + 1], sentenceb[0 : j + 1], dp[i + 1][j + 1])
+            # print()
+
+        return dp[lena][lenb]
+
+    @staticmethod
+    def fuzzy_ratio(sentencea, sentenceb):
+        ratio = fuzz.ratio(sentencea, sentenceb)
+        partial_ratio = fuzz.partial_ratio(sentencea, sentenceb)
+        token_sort_ratio = fuzz.token_sort_ratio(sentencea, sentenceb)
+        token_set_ratio = fuzz.token_set_ratio(sentencea, sentenceb)
+        partial_token_set_ratio = fuzz.partial_token_set_ratio(sentencea, sentenceb)
+        partial_token_sort_ratio = fuzz.partial_token_sort_ratio(sentencea, sentenceb)
+        return ratio, partial_ratio, token_set_ratio, token_sort_ratio, partial_token_set_ratio, partial_token_sort_ratio
+
+    def main(self):
+        for a, b in self.train_document:
+            print(a, b)
+            print(self.tf_idf_word_match(a, b))
+
+
 class data(object):
-    def __init__(self, train_file_path, test_file_path):
+    def __init__(self, train_file_path, test_file_path, stop_words_file):
 
         # 获取训练数据，数据来源于 train_file_path
         self.df = pd.read_csv(train_file_path).dropna()
         self.path = os.path.dirname(__file__)
         self.columns = ['question1', 'question2', 'is_duplicate']
+        self.stop_words = set(open(stop_words_file, "r").read().split())
 
-        # 兑换句子，构造新数据
-        # self.df = pd.concat([pd.DataFrame(data={"question1": self.df["question2"],
-        #                                         "question2": self.df["question1"],
-        #                                         "is_duplicate": self.df["is_duplicate"]},
-        #                                   columns=["question1", "question2", 'is_duplicate']),
-        #                      self.df], axis=0, ignore_index=True)
-
+        number = 0
+        print(datetime.datetime.now().isoformat())
         self.data = self.df[['question1', 'question2']].values
-        self.label = self.df[['is_duplicate']].values
+        # for index in range(len(self.data)):
+        #     sentencea, sentenceb = self.data[index]
+        #     self.data[index][0] = remove_stop_words(sentencea, self.stop_words)
+        #     self.data[index][1] = remove_stop_words(sentenceb, self.stop_words)
+        #
+        #     number += 1
+        #     if number % 10000 == 0:
+        #         print("number :", number, datetime.datetime.now().isoformat())
+        #         print(self.data[index][0], self.data[index][1])
 
-        # data_double, label_double = [], []
-        # for (d, l) in zip(self.data, self.label):
-        #     if l == 0 and random.random() <= 0.5667:
-        #         data_double.append(d)
-        #         label_double.append(l)
-        # self.data = np.append(self.data, data_double, axis=0)
-        # self.label = np.append(self.label, label_double)
+        self.label = self.df[['is_duplicate']].values
 
         print("当前文件路径 :", self.path)
         print("self.data.shape :", self.data.shape)
         print("self.label.shape :", self.label.shape)
-
-        # 获取测试数据，数据来源于 test_file_path
-        # self.test_df = pd.concat(objs=[pd.DataFrame(data={"question1": self.test_df["question2"],
-        #                                                   "question2": self.test_df["question1"],
-        #                                                   "is_duplicate": self.test_df["is_duplicate"]},
-        #                                             columns=["question1", "question2", 'is_duplicate']),self.test_df],
-        #                          axis=0, ignore_index=True)
 
         self.test_df = pd.read_csv(test_file_path).dropna()
         self.test_data = self.test_df[['question1', 'question2']].values
@@ -136,6 +233,7 @@ class data(object):
 
         print("self.test_data.shape :", self.test_data.shape)
         print("self.test_label.shape :", self.test_label.shape)
+
 
     @staticmethod
     def text_to_wordlist(text):
@@ -204,7 +302,7 @@ class data(object):
             self.data = [self.text_to_wordlist(line) for line in self.data]
             self.test_data = [self.text_to_wordlist(line) for line in self.test_data]
 
-            vocab_processor = learn.preprocessing.VocabularyProcessor(60, min_frequency=5)
+            vocab_processor = learn.preprocessing.VocabularyProcessor(50, min_frequency=5)
             vocab_processor = vocab_processor.fit(x_text)
             print("vocab_processor 训练结束")
 
@@ -247,6 +345,7 @@ class data(object):
     @staticmethod
     def magic_feature():
         pass
+
 
 
 class data_create(object):
@@ -402,9 +501,16 @@ class data_create(object):
 
 
 if __name__ == '__main__':
-    pre_split_train()
+    # pre_split_train()
     data_file = "./data/csv/train.csv"
     train_file = "./data/csv/train_train.csv"
     test_file = "./data/csv/train_test.csv"
-    Data = data(train_file, test_file).get_one_hot()
+    stop_words_file = "./data/stop_words_eng.txt"
+
+    # Data = data(train_file, test_file, stop_words_file)
+    Data = data(train_file, test_file, stop_words_file).get_one_hot()
+
+    # ManualFeatureExtraction(data_file, train_file, test_file)
+    # feature = ManualFeatureExtraction(data_file)
+    # feature.main()
 
