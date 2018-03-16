@@ -7,6 +7,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 class Cnn(object):
     def __init__(self, sequence_length, vocab_size, embedding_size, filter_sizes, num_filters, batch_size):
         self.label = tf.placeholder(tf.float32, [None, ], name="label")
+        self.outer_feature = tf.placeholder(tf.float32, [None, 17], name="outer_feature")
         self.input_sentence_a = tf.placeholder(tf.int32, [None, sequence_length], name="input_a")
         self.input_sentence_b = tf.placeholder(tf.int32, [None, sequence_length], name="input_b")
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
@@ -45,9 +46,11 @@ class Cnn(object):
             self.diff = self.h_pool_flat_a - self.h_pool_flat_b
             self.mul = tf.multiply(self.h_pool_flat_a, self.h_pool_flat_b)
 
-            self.feature = tf.concat([self.diff, self.mul, self.h_pool_flat_a, self.h_pool_flat_b], axis=1)
+            self.feature = tf.concat(
+                values=[self.diff, self.mul, self.h_pool_flat_a, self.h_pool_flat_b, self.outer_feature],
+                axis=1)
             self.feature_drop = tf.nn.dropout(self.feature, keep_prob=self.dropout_keep_prob)
-            self.weight = tf.Variable(tf.truncated_normal(shape=[num_filters * len(filter_sizes) * 4, 1],
+            self.weight = tf.Variable(tf.truncated_normal(shape=[num_filters * len(filter_sizes) * 4 + 17, 1],
                                                           stddev=0.1,
                                                           mean=0.0))
             self.bias = tf.Variable(tf.truncated_normal(shape=[1], stddev=0.1, mean=0.0))

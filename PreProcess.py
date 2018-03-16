@@ -239,8 +239,8 @@ class data(object):
         return self
 
     @staticmethod
-    def get_batch(epoches, batch_size, data, label):
-        data = list(zip(data, label))
+    def get_batch(epoches, batch_size, data, out_feature, label):
+        data = list(zip(data, out_feature, label))
         for epoch in range(epoches):
             random.shuffle(data)
             for batch in range(0, len(data), batch_size):
@@ -392,8 +392,8 @@ class data_create(object):
         return self
 
     @staticmethod
-    def get_batch(epoches, batch_size, data, label):
-        data = list(zip(data, label))
+    def get_batch(epoches, batch_size, data, out_feature, label):
+        data = list(zip(data, out_feature, label))
         for epoch in range(epoches):
             random.shuffle(data)
             for batch in range(0, len(data), batch_size):

@@ -31,11 +31,12 @@ def remove_stop_words(sentence, stop_words_set):
 
 
 class sentiment(object):
-    def __init__(self):
-        self.df = pd.read_csv("./data/csv/Tweets.csv")
+    def __init__(self, twitter_path, xgboost_path, lr_path):
+        self.df = pd.read_csv(twitter_path)
         self.data = np.squeeze(self.df[['text']].values, axis=1)
         self.label = self.df[['airline_sentiment', 'airline_sentiment_confidence']].values
         self.value = [0] * len(self.label)
+        self.twitter_path, self.xgboost_path, self.lr_path = twitter_path, xgboost_path, lr_path
 
         for index in range(len(self.label)):
             if self.label[index][0] == 'neutral':
@@ -74,7 +75,7 @@ class sentiment(object):
         y_pred_xgb = regr.predict(self.test_x)
         print(classification_report(y_true= np.expand_dims(self.test_y, axis=-1),
                                     y_pred=y_pred_xgb))
-        joblib.dump(regr, './data/xgb_sentiment.model')
+        joblib.dump(regr, self.xgboost_path)
 
     def logisticRegression(self):
         print(self.train_x.shape)
@@ -83,11 +84,11 @@ class sentiment(object):
         y_pred_lr = self.lr.predict(self.test_x)
         print(classification_report(y_true=np.expand_dims(self.test_y, axis=-1),
                                     y_pred=y_pred_lr))
-        joblib.dump(self.lr, "./data/lr_sentiment.model")
+        joblib.dump(self.lr, self.lr_path)
 
 
 class ManualFeatureExtraction(object):
-    def __init__(self, data_file):
+    def __init__(self, feature_path, data_file, lr_path):
         self.df = pd.read_csv(data_file).dropna()[['question1', 'question2']]
         self.corpus = np.reshape(a=self.df.values,
                                  newshape=len(self.df.values) * 2)
@@ -103,8 +104,9 @@ class ManualFeatureExtraction(object):
 
 
         print(self.df.values.shape)
+        self.feature_path = feature_path
         self.train_document = self.df.values
-        self.lr = joblib.load("./data/lr_sentiment.model")
+        self.lr = joblib.load(lr_path)
 
     def tf_idf_word_match(self, sentencea, sentenceb):
         sentencea = sentencea.split()
@@ -183,12 +185,6 @@ class ManualFeatureExtraction(object):
             length_difference = list(self.length_difference(sentencea, sentenceb))
             tf_idf_word_match = [self.tf_idf_word_match(sentencea, sentenceb)]
 
-            # self.lcs.append(lcs)
-            # self.ratio.append(ratio)
-            # self.sentiment.append(sentiment)
-            # self.edit_distance.append(edit_distance)
-            # self.length_diff.append(length_difference)
-
             tmp = edit_distance + sentiment + ratio + lcs + length_difference + tf_idf_word_match
             self.outer_feature.append(tmp)
 
@@ -197,7 +193,8 @@ class ManualFeatureExtraction(object):
                 datetimestr = datetime.datetime.now().isoformat()
                 print(datetimestr, number, "lines processed", np.array(self.outer_feature).shape)
 
-        print(datetime.datetime.now().isoformat())
+        pickle.dump(self.outer_feature, open(self.feature_path, "wb"))
+        return np.array(self.outer_feature)
 
 
 if __name__ == '__main__':
@@ -210,10 +207,9 @@ if __name__ == '__main__':
     # sentiment().xgbRegressionModel()
     # sentiment().logisticRegression()
 
-    # Data = data(train_file, test_file, stop_words_file)
-    # Data = data(train_file, test_file, stop_words_file).get_one_hot()
     print(datetime.datetime.now().isoformat())
-    ManualFeatureExtraction(data_file).main()
+    outer_feature = ManualFeatureExtraction(data_file, "").main()
+    print(datetime.datetime.now().isoformat())
     # feature = ManualFeatureExtraction(data_file)
     # feature.main()
 

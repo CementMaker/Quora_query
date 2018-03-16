@@ -6,6 +6,7 @@ import sys
 from cnn import *
 sys.path.append("../")
 from PreProcess import *
+from extral_features import *
 from sklearn.metrics import log_loss
 from sklearn.metrics import classification_report
 from sklearn.model_selection import KFold, cross_val_score
@@ -58,27 +59,33 @@ class siamese_network_cnn(object):
         self.sess = tf.Session()
         self.cnn = Cnn(sequence_length=50,
                        vocab_size=73300,
-                       embedding_size=128,
+                       embedding_size=50,
                        filter_sizes=[1, 2, 3, 4, 5, 6],
-                       num_filters=100,
+                       num_filters=50,
                        batch_size=1500)
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
         self.optimizer = tf.train.AdamOptimizer(0.001).minimize(self.cnn.loss, global_step=self.global_step)
         self.sess.run(tf.global_variables_initializer())
 
         # 训练数据测试数据的获取，但是好像有点问题
+        self.lr_path = "../data/lr_sentiment.model"
+        self.twitter_path = "../data/csv/Tweets.csv"
+        self.feature_path = "../data/feature.pkl"
+        self.stop_words_file = "../data/stop_words_eng.txt"
         self.data_file = os.path.join(os.path.dirname(__file__), "../data/csv/train.csv")
         self.train_file = os.path.join(os.path.dirname(__file__), "../data/csv/train_train.csv")
         self.test_file = os.path.join(os.path.dirname(__file__), "../data/csv/train_test.csv")
-        self.stop_words_file = "../data/stop_words_eng.txt"
 
         # self.data_create = data_create(self.data_file).get_one_hot()
+        # self.outer_feature = ManualFeatureExtraction(self.feature_path, self.data_file, self.lr_path).main()
+
+        self.outer_feature = pickle.load(open("../data/feature.pkl", "rb"))
         self.data_create = data(self.train_file, self.test_file, self.stop_words_file).get_one_hot()
         self.train_data, self.train_label = self.data_create.vec_train, self.data_create.label
         self.test_data, self.test_label = self.data_create.vec_test, self.data_create.test_label
 
         # 获取训练数据迭代器并且获取测试数据（用于神经网络验证）
-        self.batches = data.get_batch(15, 1500, self.train_data, self.train_label)
+        self.batches = data.get_batch(15, 1000, self.train_data, self.outer_feature, self.train_label)
         data_double, label_double = [], []
         for (d, l) in zip(self.test_data, self.test_label):
             if l == 0 and random.random() <= 0.5667:
@@ -107,7 +114,7 @@ class siamese_network_cnn(object):
         self.summary_writer_train = tf.summary.FileWriter("../summary/train", graph=self.sess.graph)
         self.summary_writer_test = tf.summary.FileWriter("../summary/test", graph=self.sess.graph)
 
-    def train_step(self, a_batch, b_batch, label):
+    def train_step(self, a_batch, b_batch, outer_feature, label):
         '''
         神经网路的训练过程
         :param a_batch: Siamese网络左边的输入
@@ -118,7 +125,8 @@ class siamese_network_cnn(object):
         feed_dict = {
             self.cnn.input_sentence_a: a_batch,
             self.cnn.input_sentence_b: b_batch,
-            self.cnn.dropout_keep_prob: 0.2,
+            self.cnn.outer_feature: outer_feature,
+            self.cnn.dropout_keep_prob: 0.5,
             self.cnn.label: label
         }
         _, summary, step, log_loss, loss, accuracy = self.sess.run(
@@ -130,7 +138,7 @@ class siamese_network_cnn(object):
         self.train_loss.append(loss)
         self.train_accuracy.append(accuracy)
 
-    def dev_step(self, a_batch, b_batch, label):
+    def dev_step(self, a_batch, b_batch, outer_feature, label):
         '''
         神经网路的验证过程，查看网络是否收敛
         :param a_batch: Siamese网络左边的输入
@@ -141,6 +149,7 @@ class siamese_network_cnn(object):
         feed_dict = {
             self.cnn.input_sentence_a: a_batch,
             self.cnn.input_sentence_b: b_batch,
+            self.cnn.outer_feature: outer_feature,
             self.cnn.dropout_keep_prob: 1.0,
             self.cnn.label: label
         }
@@ -191,15 +200,15 @@ class siamese_network_cnn(object):
     def main(self, flag=False):
         '''神经网络的入口，整个网络的运行过程'''
         for batch in self.batches:
-            x, y = zip(*batch)
+            x, outer_feature, y = zip(*batch)
             batch_a = np.array([a for (a, b) in x])
             batch_b = np.array([b for (a, b) in x])
-            self.train_step(batch_a, batch_b, np.squeeze(y, axis=1))
+            self.train_step(batch_a, batch_b, outer_feature, np.squeeze(y, axis=1))
             current_step = tf.train.global_step(self.sess, self.global_step)
 
             if current_step % 50 == 0:
                 print("\nEvaluation:")
-                self.dev_step(self.test_a, self.test_b, self.y_test)
+                # self.dev_step(self.test_a, self.test_b, outer_feature, self.y_test)
                 print("")
         self.draw_chart()
 
