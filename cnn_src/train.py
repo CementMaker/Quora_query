@@ -64,7 +64,7 @@ class siamese_network_cnn(object):
                        num_filters=50,
                        batch_size=1500)
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        self.optimizer = tf.train.AdamOptimizer(0.001).minimize(self.cnn.loss, global_step=self.global_step)
+        self.optimizer = tf.train.AdamOptimizer(0.0001).minimize(self.cnn.loss, global_step=self.global_step)
         self.sess.run(tf.global_variables_initializer())
 
         # 训练数据测试数据的获取，但是好像有点问题
@@ -79,20 +79,35 @@ class siamese_network_cnn(object):
         # self.data_create = data_create(self.data_file).get_one_hot()
         # self.outer_feature = ManualFeatureExtraction(self.feature_path, self.data_file, self.lr_path).main()
 
-        self.outer_feature = pickle.load(open("../data/feature.pkl", "rb"))
         self.data_create = data(self.train_file, self.test_file, self.stop_words_file).get_one_hot()
         self.train_data, self.train_label = self.data_create.vec_train, self.data_create.label
         self.test_data, self.test_label = self.data_create.vec_test, self.data_create.test_label
+        self.test_feature, self.train_feature = self.data_create.test_feature, self.data_create.train_feature
+
+        print("*****************************************************************************")
+        print("self.train_data.shape :", np.array(self.train_data).shape)
+        print("self.test_feature.shape :", np.array(self.test_feature).shape)
+        print("self.train_feature.shape :", np.array(self.train_feature).shape)
+        print("self.train_label.shap :", np.array(self.train_label).shape)
+        print("*****************************************************************************")
+        print(">>> a = [1, 2, 3, 4, 5] \n"
+              ">>> b = [1, 2, 3, 4, 5, 6, 7] \n"
+              ">>> list(zip(a, b)) \n"
+              ">>> [(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)] \n"
+              "\t长一点的数组与短一点的数组进行zip会忽略长数组的后面一部分")
+        print("*****************************************************************************")
 
         # 获取训练数据迭代器并且获取测试数据（用于神经网络验证）
-        self.batches = data.get_batch(15, 1000, self.train_data, self.outer_feature, self.train_label)
-        data_double, label_double = [], []
-        for (d, l) in zip(self.test_data, self.test_label):
+        self.batches = data.get_batch(7, 1000, self.train_data, self.train_feature, self.train_label)
+        data_double, label_double, feature_double = [], [], []
+        for (d, l, f) in zip(self.test_data, self.test_label, self.test_feature):
             if l == 0 and random.random() <= 0.5667:
                 data_double.append(d)
                 label_double.append(l)
+                feature_double.append(f)
         self.test_data = np.append(self.test_data, data_double, axis=0)
         self.test_label = np.append(self.test_label, label_double)
+        self.test_feature = np.append(self.test_feature, feature_double, axis=0)
         self.test_a, self.test_b, self.y_test = function.dev_data(self.test_data, self.test_label)
 
         # 获取test数据
@@ -146,6 +161,7 @@ class siamese_network_cnn(object):
         :param label: 标签
         :return: 验证网络，没有返回值
         '''
+
         feed_dict = {
             self.cnn.input_sentence_a: a_batch,
             self.cnn.input_sentence_b: b_batch,
@@ -208,20 +224,20 @@ class siamese_network_cnn(object):
 
             if current_step % 50 == 0:
                 print("\nEvaluation:")
-                # self.dev_step(self.test_a, self.test_b, outer_feature, self.y_test)
+                self.dev_step(self.test_a, self.test_b, self.test_feature, self.y_test)
                 print("")
         self.draw_chart()
 
         # 将测试集拿出来训练
-        if flag is True:
-            self.batches = data.get_batch(7, 1500, zip(self.test_a, self.test_b), self.y_test)
-            for batch in self.batches:
-                x, y = zip(*batch)
-                batch_a = np.array([a for (a, b) in x])
-                batch_b = np.array([b for (a, b) in x])
-                self.train_step(batch_a, batch_b, np.squeeze(y, axis=1))
+        # if flag is True:
+        #     self.batches = data.get_batch(7, 1500, zip(self.test_a, self.test_b), self.y_test)
+        #     for batch in self.batches:
+        #         x, y = zip(*batch)
+        #         batch_a = np.array([a for (a, b) in x])
+        #         batch_b = np.array([b for (a, b) in x])
+        #         self.train_step(batch_a, batch_b, np.squeeze(y, axis=1))
+        # self.predict()
 
-        self.predict()
         print("Run the command line:\n"
               "--> tensorboard --logdir=summary"
               "\nThen open http://0.0.0.0:6006/ into your web browser")

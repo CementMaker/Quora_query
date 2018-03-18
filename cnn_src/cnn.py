@@ -47,8 +47,7 @@ class Cnn(object):
             self.mul = tf.multiply(self.h_pool_flat_a, self.h_pool_flat_b)
 
             self.feature = tf.concat(
-                values=[self.diff, self.mul, self.h_pool_flat_a, self.h_pool_flat_b, self.outer_feature],
-                axis=1)
+                values=[self.diff, self.mul, self.h_pool_flat_a, self.h_pool_flat_b, self.outer_feature], axis=1)
             self.feature_drop = tf.nn.dropout(self.feature, keep_prob=self.dropout_keep_prob)
             self.weight = tf.Variable(tf.truncated_normal(shape=[num_filters * len(filter_sizes) * 4 + 17, 1],
                                                           stddev=0.1,
@@ -59,9 +58,6 @@ class Cnn(object):
             self.ans = tf.squeeze(self.logits, axis=1)
 
         with tf.name_scope("loss"):
-            # log_loss
-            # tf.nn.softmax_cross_entropy_with_logits:
-            #   先计算logits的softmax函数值，如果Logits就是一个概率分布，会带来loss并不是实际loss的问题
             self.l2_loss = self.l2_loss + tf.nn.l2_loss(self.weight) + tf.nn.l2_loss(self.bias)
             self.log_loss = tf.losses.log_loss(labels=self.label, predictions=self.ans)
             self.loss = self.log_loss# + 0.001 * self.l2_loss

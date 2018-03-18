@@ -117,11 +117,12 @@ class ManualFeatureExtraction(object):
         if(len(match) == 0): return 0.
         tf_idf_a = self.vectorizer.transform([match]).toarray()[0]
         tf_idf_b = self.vectorizer.transform([combine]).toarray()[0]
-        return sum(tf_idf_a) / sum(tf_idf_b)
+        return sum(tf_idf_a) / sum(tf_idf_b + 1.0)
 
     @staticmethod
     def length_difference(sentencea, sentenceb):
-        return len(sentencea) - len(sentenceb), len(sentencea.split()) - len(sentenceb.split())
+        return (len(sentencea) - len(sentenceb)) / max(len(sentencea), len(sentenceb)),\
+               (len(sentencea.split()) - len(sentenceb.split())) / max(len(sentencea.split()), len(sentenceb.split()))
 
     @staticmethod
     def LongCommonSequence(sentencea, sentenceb):
@@ -137,7 +138,7 @@ class ManualFeatureExtraction(object):
                 else:
                     dp[i + 1][j + 1] = max(dp[i + 1][j], dp[i][j + 1])
 
-        return dp[lena][lenb]
+        return dp[lena][lenb] / max(len(sentencea), len(sentenceb))
 
     @staticmethod
     def edit_distance_word(sentencea, sentenceb):
@@ -158,16 +159,16 @@ class ManualFeatureExtraction(object):
                 else:
                     dp[i + 1][j + 1] = min(dp[i + 1][j], dp[i][j + 1], dp[i][j]) + 1
 
-        return dp[lena][lenb]
+        return dp[lena][lenb] / max(len(sentencea), len(sentenceb))
 
     @staticmethod
     def fuzzy_ratio(sentencea, sentenceb):
-        ratio = fuzz.ratio(sentencea, sentenceb)
-        partial_ratio = fuzz.partial_ratio(sentencea, sentenceb)
-        token_sort_ratio = fuzz.token_sort_ratio(sentencea, sentenceb)
-        token_set_ratio = fuzz.token_set_ratio(sentencea, sentenceb)
-        partial_token_set_ratio = fuzz.partial_token_set_ratio(sentencea, sentenceb)
-        partial_token_sort_ratio = fuzz.partial_token_sort_ratio(sentencea, sentenceb)
+        ratio = fuzz.ratio(sentencea, sentenceb) / 100
+        partial_ratio = fuzz.partial_ratio(sentencea, sentenceb) / 100
+        token_sort_ratio = fuzz.token_sort_ratio(sentencea, sentenceb) / 100
+        token_set_ratio = fuzz.token_set_ratio(sentencea, sentenceb) / 100
+        partial_token_set_ratio = fuzz.partial_token_set_ratio(sentencea, sentenceb) / 100
+        partial_token_sort_ratio = fuzz.partial_token_sort_ratio(sentencea, sentenceb) / 100
         return ratio, partial_ratio, token_set_ratio, token_sort_ratio, partial_token_set_ratio, partial_token_sort_ratio
 
     def main(self):
@@ -208,7 +209,6 @@ if __name__ == '__main__':
     # sentiment().logisticRegression()
 
     print(datetime.datetime.now().isoformat())
-    outer_feature = ManualFeatureExtraction(data_file, "").main()
     print(datetime.datetime.now().isoformat())
     # feature = ManualFeatureExtraction(data_file)
     # feature.main()
