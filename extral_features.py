@@ -15,10 +15,17 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
+from sklearn.metrics import pairwise
+from sklearn.metrics import jaccard_similarity_score
 from sklearn.externals import joblib
 
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
+
+
+from gensim.models import Word2Vec
+from nltk.corpus import stopwords
+from gensim.similarities import WmdSimilarity
 
 
 def remove_stop_words(sentence, stop_words_set):
@@ -198,18 +205,78 @@ class ManualFeatureExtraction(object):
         return np.array(self.outer_feature)
 
 
+class distance(object):
+    def __init__(self, data_path, word2vecpath, pkl):
+        self.pkl = pkl
+        self.data = pd.read_csv(data_path)[['question1', 'question2']].dropna()
+        self.vectorizer_corpus = np.reshape(self.data.values,
+                                            newshape=[len(self.data.values) * 2])
+        self.word2vecModel = Word2Vec.load(word2vecpath)
+        self.word2vecModel.init_sims(replace=True)
+
+        # tf-idf 向量
+        self.vectorizer = TfidfVectorizer(
+            max_df=0.5,
+            max_features=3000,
+            min_df=3,
+            lowercase=False,
+            decode_error='ignore'
+        ).fit(self.vectorizer_corpus)
+
+        self.x = np.squeeze(pd.read_csv(data_path)[['question1']].fillna("").values, axis=1)
+        self.y = np.squeeze(pd.read_csv(data_path)[['question2']].fillna("").values, axis=1)
+
+        self.X = self.vectorizer.transform(self.x)
+        self.Y = self.vectorizer.transform(self.y)
+        self.cosine = pairwise.paired_cosine_distances(self.X, self.Y)
+        self.euclidean = pairwise.paired_euclidean_distances(self.X, self.Y)
+        self.manhattan = pairwise.paired_manhattan_distances(self.X, self.Y)
+        print(self.cosine.shape)
+        print(self.euclidean.shape)
+        print(self.manhattan.shape)
+
+    def WordMoversDistance(self):
+        number = 0
+        wordmoversdistance = []
+        stop_words = stopwords.words('english')
+        for a, b in zip(self.x, self.y):
+            sentencea, sentenceb = a.split(), b.split()
+            sentencea = [word for word in sentencea if word not in stop_words]
+            sentenceb = [word for word in sentenceb if word not in stop_words]
+            wordmoversdistance.append(self.word2vecModel.wmdistance(sentencea, sentenceb))
+
+            number += 1
+            if number % 5000 == 0:
+                print(number, "lines processed")
+        return np.array(wordmoversdistance)
+
+
+    def main(self):
+        wordmoversdistance = self.WordMoversDistance()
+        feature = np.array(list(zip(self.cosine, self.euclidean, self.manhattan, wordmoversdistance)))
+        print(feature.shape)
+        pickle.dump(feature, open(pkl, "wb"))
+        return feature
+
+
+
 if __name__ == '__main__':
     # pre_split_train()
-    data_file = "./data/csv/train.csv"
+    data_file = "./data/csv/test.csv"
     train_file = "./data/csv/train_train.csv"
     test_file = "./data/csv/train_test.csv"
     stop_words_file = "./data/stop_words_eng.txt"
+    word2vecpath = "./data/word_vec/word2vec.model"
+    pkl = "./data/pkl/test_distance.pkl"
+
 
     # sentiment().xgbRegressionModel()
     # sentiment().logisticRegression()
 
-    print(datetime.datetime.now().isoformat())
-    print(datetime.datetime.now().isoformat())
+    # print(datetime.datetime.now().isoformat())
+    # print(datetime.datetime.now().isoformat())
     # feature = ManualFeatureExtraction(data_file)
     # feature.main()
+
+    distance(data_file, word2vecpath, pkl).main()
 

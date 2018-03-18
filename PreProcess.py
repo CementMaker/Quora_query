@@ -19,20 +19,21 @@ from extral_features import *
 path = os.getcwd()
 
 
-columns=['question1', 'question2', 'lcs_test', 'edit_distance_test',
-         'sentiment1_test', 'sentiment2_test', 'sentiment3_test',
-         'sentiment4_test', 'sentiment5_test', 'sentiment6_test',
-         'ratio1_test', 'ratio2_test', 'ratio3_test', 'ratio4_test','ratio5_test', 'ratio6_test',
-         'length_difference1_test', 'length_difference2_test',
-         'tf_idf_word_match_test',
-         'is_duplicate']
+columns = ['question1', 'question2', 'lcs', 'edit_distance',
+           'sentiment1', 'sentiment2', 'sentiment3', 'sentiment4', 'sentiment5', 'sentiment6',
+           'ratio1', 'ratio2', 'ratio3', 'ratio4','ratio5', 'ratio6',
+           'length_difference1', 'length_difference2',
+           'tf_idf_word_match',
+           'cosine', 'euclidean', 'manhattan', 'wordmoversdistance',
+           'is_duplicate']
 
-columns_extra_feature = ['lcs_test', 'edit_distance_test',
-                         'sentiment1_test', 'sentiment2_test', 'sentiment3_test',
-                         'sentiment4_test', 'sentiment5_test', 'sentiment6_test',
-                         'ratio1_test', 'ratio2_test', 'ratio3_test', 'ratio4_test','ratio5_test', 'ratio6_test',
-                         'length_difference1_test', 'length_difference2_test',
-                         'tf_idf_word_match_test']
+columns_extra_feature = ['lcs', 'edit_distance',
+                         'sentiment1', 'sentiment2', 'sentiment3', 'sentiment4', 'sentiment5', 'sentiment6',
+                         'ratio1', 'ratio2', 'ratio3', 'ratio4','ratio5', 'ratio6',
+                         'length_difference1', 'length_difference2',
+                         'tf_idf_word_match',
+                         'cosine', 'euclidean', 'manhattan', 'wordmoversdistance']
+
 
 def preprocess_tocsv(file_path):
     df_old = pd.read_csv(file_path).dropna(axis=0)
@@ -86,86 +87,73 @@ def preprocess_tocsv(file_path):
     df_new.to_csv('test_new.csv', index=False)
 
 
-def pre_split_train(out_feature):
+def pre_split_train(out_feature, train_distance):
     df = pd.read_csv("./data/csv/train.csv").dropna()
     data = df[['question1', 'question2', 'is_duplicate']].values
     # 获取句子的extra feature
     outer_feature = np.array(pickle.load(open(out_feature, "rb")))
+    train_distance = np.array(pickle.load(open(train_distance, "rb")))
 
     # random.shuffle(data)
     data_x = data[0:len(data), 0:2]
     data_y = data[0:len(data), 2:3]
     test_x, train_x = data_x[0:5000, :], data_x[5000:len(data_x), :]
     test_y, train_y = data_y[0:5000, :], data_y[5000:len(data_y), :]
-    feature_test, feature_train = outer_feature[0:5000, :], outer_feature[5000:len(outer_feature), :]
 
-    lcs_test, lcs_train = outer_feature[0:5000, 13:14], outer_feature[5000:len(outer_feature), 13:14]
-    edit_distance_test, edit_distance_train = outer_feature[0:5000, 0:1], outer_feature[5000:len(outer_feature), 0:1]
-
-    sentiment1_test, sentiment1_train = outer_feature[0:5000, 1:2], outer_feature[5000:len(outer_feature), 1:2]
-    sentiment2_test, sentiment2_train = outer_feature[0:5000, 2:3], outer_feature[5000:len(outer_feature), 2:3]
-    sentiment3_test, sentiment3_train = outer_feature[0:5000, 3:4], outer_feature[5000:len(outer_feature), 3:4]
-    sentiment4_test, sentiment4_train = outer_feature[0:5000, 4:5], outer_feature[5000:len(outer_feature), 4:5]
-    sentiment5_test, sentiment5_train = outer_feature[0:5000, 5:6], outer_feature[5000:len(outer_feature), 5:6]
-    sentiment6_test, sentiment6_train = outer_feature[0:5000, 6:7], outer_feature[5000:len(outer_feature), 6:7]
-
-    ratio1_test, ratio1_train = outer_feature[0:5000, 7:8], outer_feature[5000:len(outer_feature), 7:8]
-    ratio2_test, ratio2_train = outer_feature[0:5000, 8:9], outer_feature[5000:len(outer_feature), 8:9]
-    ratio3_test, ratio3_train = outer_feature[0:5000, 9:10], outer_feature[5000:len(outer_feature), 9:10]
-    ratio4_test, ratio4_train = outer_feature[0:5000, 10:11], outer_feature[5000:len(outer_feature), 10:11]
-    ratio5_test, ratio5_train = outer_feature[0:5000, 11:12], outer_feature[5000:len(outer_feature), 11:12]
-    ratio6_test, ratio6_train = outer_feature[0:5000, 12:13], outer_feature[5000:len(outer_feature), 12:13]
-    length_difference1_test, length_difference1_train = outer_feature[0:5000, 14:15], outer_feature[5000:len(outer_feature), 14:15]
-    length_difference1_test, length_difference1_train = outer_feature[0:5000, 15:16], outer_feature[5000:len(outer_feature), 15:16]
-    tf_idf_word_match_test, tf_idf_word_match_test = outer_feature[0:5000, 16:17], outer_feature[5000:len(outer_feature), 16:17]
-
-    print("********************************************")
-    print(feature_test.shape)
-    print(feature_train.shape)
-    print(data_x.shape)
-    print("********************************************")
+    test_cosine, train_cosine = train_distance[0:5000, 0:1], train_distance[5000:len(train_distance), 0:1]
+    test_euclidean, train_euclidean = train_distance[0:5000, 1:2], train_distance[5000:len(train_distance), 1:2]
+    test_manhattan, train_manhattan = train_distance[0:5000, 2:3], train_distance[5000:len(train_distance), 2:3]
+    test_wordmoversdistance, train_wordmoversdistance = train_distance[0:5000, 3:4], train_distance[5000:len(train_distance), 3:4]
 
     test_df = pd.DataFrame(data={'question1': np.squeeze(test_x[:, 0:1], axis=1),
                                  'question2': np.squeeze(test_x[:, 1:2], axis=1),
-                                 'lcs_test': np.squeeze(outer_feature[0:5000, 13:14], axis=1),
-                                 'edit_distance_test': np.squeeze(outer_feature[0:5000, 0:1], axis=1),
-                                 'sentiment1_test': np.squeeze(outer_feature[0:5000, 1:2], axis=1),
-                                 'sentiment2_test': np.squeeze(outer_feature[0:5000, 2:3], axis=1),
-                                 'sentiment3_test': np.squeeze(outer_feature[0:5000, 3:4], axis=1),
-                                 'sentiment4_test': np.squeeze(outer_feature[0:5000, 4:5], axis=1),
-                                 'sentiment5_test': np.squeeze(outer_feature[0:5000, 5:6], axis=1),
-                                 'sentiment6_test': np.squeeze(outer_feature[0:5000, 6:7], axis=1),
-                                 'ratio1_test': np.squeeze(outer_feature[0:5000, 7:8], axis=1),
-                                 'ratio2_test': np.squeeze(outer_feature[0:5000, 8:9], axis=1),
-                                 'ratio3_test': np.squeeze(outer_feature[0:5000, 9:10], axis=1),
-                                 'ratio4_test': np.squeeze(outer_feature[0:5000, 10:11], axis=1),
-                                 'ratio5_test': np.squeeze(outer_feature[0:5000, 11:12], axis=1),
-                                 'ratio6_test': np.squeeze(outer_feature[0:5000, 12:13], axis=1),
-                                 'length_difference1_test': np.squeeze(outer_feature[0:5000, 14:15], axis=1),
-                                 'length_difference2_test': np.squeeze(outer_feature[0:5000, 15:16], axis=1),
-                                 'tf_idf_word_match_test': np.squeeze(outer_feature[0:5000, 16:17], axis=1),
+                                 'lcs': np.squeeze(outer_feature[0:5000, 13:14], axis=1),
+                                 'edit_distance': np.squeeze(outer_feature[0:5000, 0:1], axis=1),
+                                 'sentiment1': np.squeeze(outer_feature[0:5000, 1:2], axis=1),
+                                 'sentiment2': np.squeeze(outer_feature[0:5000, 2:3], axis=1),
+                                 'sentiment3': np.squeeze(outer_feature[0:5000, 3:4], axis=1),
+                                 'sentiment4': np.squeeze(outer_feature[0:5000, 4:5], axis=1),
+                                 'sentiment5': np.squeeze(outer_feature[0:5000, 5:6], axis=1),
+                                 'sentiment6': np.squeeze(outer_feature[0:5000, 6:7], axis=1),
+                                 'ratio1': np.squeeze(outer_feature[0:5000, 7:8], axis=1),
+                                 'ratio2': np.squeeze(outer_feature[0:5000, 8:9], axis=1),
+                                 'ratio3': np.squeeze(outer_feature[0:5000, 9:10], axis=1),
+                                 'ratio4': np.squeeze(outer_feature[0:5000, 10:11], axis=1),
+                                 'ratio5': np.squeeze(outer_feature[0:5000, 11:12], axis=1),
+                                 'ratio6': np.squeeze(outer_feature[0:5000, 12:13], axis=1),
+                                 'length_difference1': np.squeeze(outer_feature[0:5000, 14:15], axis=1),
+                                 'length_difference2': np.squeeze(outer_feature[0:5000, 15:16], axis=1),
+                                 'tf_idf_word_match': np.squeeze(outer_feature[0:5000, 16:17], axis=1),
+                                 'cosine':  np.squeeze(test_cosine, axis=1),
+                                 'euclidean': np.squeeze(test_euclidean, axis=1),
+                                 'manhattan': np.squeeze(test_manhattan, axis=1),
+                                 'wordmoversdistance': np.squeeze(test_wordmoversdistance, axis=1),
                                  'is_duplicate': np.squeeze(test_y, axis=1)},
                            columns=[columns])
 
     train_df = pd.DataFrame(data={'question1': np.squeeze(train_x[:, 0:1], axis=1),
                                   'question2': np.squeeze(train_x[:, 1:2], axis=1),
-                                  'lcs_test': np.squeeze(outer_feature[5000:len(outer_feature), 13:14], axis=1),
-                                  'edit_distance_test': np.squeeze(outer_feature[5000:len(outer_feature), 0:1], axis=1),
-                                  'sentiment1_test': np.squeeze(outer_feature[5000:len(outer_feature), 1:2], axis=1),
-                                  'sentiment2_test': np.squeeze(outer_feature[5000:len(outer_feature), 2:3], axis=1),
-                                  'sentiment3_test': np.squeeze(outer_feature[5000:len(outer_feature), 3:4], axis=1),
-                                  'sentiment4_test': np.squeeze(outer_feature[5000:len(outer_feature), 4:5], axis=1),
-                                  'sentiment5_test': np.squeeze(outer_feature[5000:len(outer_feature), 5:6], axis=1),
-                                  'sentiment6_test': np.squeeze(outer_feature[5000:len(outer_feature), 6:7], axis=1),
-                                  'ratio1_test': np.squeeze(outer_feature[5000:len(outer_feature), 7:8], axis=1),
-                                  'ratio2_test': np.squeeze(outer_feature[5000:len(outer_feature), 8:9], axis=1),
-                                  'ratio3_test': np.squeeze(outer_feature[5000:len(outer_feature), 9:10], axis=1),
-                                  'ratio4_test': np.squeeze(outer_feature[5000:len(outer_feature), 10:11], axis=1),
-                                  'ratio5_test': np.squeeze(outer_feature[5000:len(outer_feature), 11:12], axis=1),
-                                  'ratio6_test': np.squeeze(outer_feature[5000:len(outer_feature), 12:13], axis=1),
-                                  'length_difference1_test': np.squeeze(outer_feature[5000:len(outer_feature), 14:15], axis=1),
-                                  'length_difference2_test': np.squeeze(outer_feature[5000:len(outer_feature), 15:16], axis=1),
-                                  'tf_idf_word_match_test': np.squeeze(outer_feature[5000:len(outer_feature), 16:17], axis=1),
+                                  'lcs': np.squeeze(outer_feature[5000:len(outer_feature), 13:14], axis=1),
+                                  'edit_distance': np.squeeze(outer_feature[5000:len(outer_feature), 0:1], axis=1),
+                                  'sentiment1': np.squeeze(outer_feature[5000:len(outer_feature), 1:2], axis=1),
+                                  'sentiment2': np.squeeze(outer_feature[5000:len(outer_feature), 2:3], axis=1),
+                                  'sentiment3': np.squeeze(outer_feature[5000:len(outer_feature), 3:4], axis=1),
+                                  'sentiment4': np.squeeze(outer_feature[5000:len(outer_feature), 4:5], axis=1),
+                                  'sentiment5': np.squeeze(outer_feature[5000:len(outer_feature), 5:6], axis=1),
+                                  'sentiment6': np.squeeze(outer_feature[5000:len(outer_feature), 6:7], axis=1),
+                                  'ratio1': np.squeeze(outer_feature[5000:len(outer_feature), 7:8], axis=1),
+                                  'ratio2': np.squeeze(outer_feature[5000:len(outer_feature), 8:9], axis=1),
+                                  'ratio3': np.squeeze(outer_feature[5000:len(outer_feature), 9:10], axis=1),
+                                  'ratio4': np.squeeze(outer_feature[5000:len(outer_feature), 10:11], axis=1),
+                                  'ratio5': np.squeeze(outer_feature[5000:len(outer_feature), 11:12], axis=1),
+                                  'ratio6': np.squeeze(outer_feature[5000:len(outer_feature), 12:13], axis=1),
+                                  'length_difference1': np.squeeze(outer_feature[5000:len(outer_feature), 14:15], axis=1),
+                                  'length_difference2': np.squeeze(outer_feature[5000:len(outer_feature), 15:16], axis=1),
+                                  'tf_idf_word_match': np.squeeze(outer_feature[5000:len(outer_feature), 16:17], axis=1),
+                                  'cosine': np.squeeze(train_cosine, axis=1),
+                                  'euclidean': np.squeeze(train_euclidean, axis=1),
+                                  'manhattan': np.squeeze(train_manhattan, axis=1),
+                                  'wordmoversdistance': np.squeeze(train_wordmoversdistance, axis=1),
                                   'is_duplicate': np.squeeze(train_y, axis=1)},
                             columns=[columns])
 
@@ -173,6 +161,7 @@ def pre_split_train(out_feature):
     test_df.to_csv("./data/csv/train_test.csv", columns=columns)
     train_df.to_csv("./data/csv/train_train.csv", columns=columns)
     print("写入csv数据成功！！！")
+
 
 
 def remove_stop_words(sentence, stop_words_set):
@@ -334,4 +323,4 @@ if __name__ == '__main__':
     train_file = "./data/csv/train_train.csv"
     test_file = "./data/csv/train_test.csv"
     stop_words_file = "./data/stop_words_eng.txt"
-    pre_split_train("./data/feature.pkl")
+    pre_split_train("./data/feature.pkl", "./data/pkl/train_distance.pkl")
