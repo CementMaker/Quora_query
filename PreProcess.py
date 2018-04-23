@@ -29,14 +29,13 @@ columns = ['question1', 'question2', 'lcs', 'edit_distance',
 
 columns_extra_feature = ['lcs', 'edit_distance',
                          'sentiment1', 'sentiment2', 'sentiment3', 'sentiment4', 'sentiment5', 'sentiment6',
-                         'ratio1', 'ratio2', 'ratio3', 'ratio4','ratio5', 'ratio6',
-                         'length_difference1', 'length_difference2',
-                         'tf_idf_word_match',
-                         'cosine', 'euclidean', 'manhattan', 'wordmoversdistance']
+                         'ratio1', 'ratio2', 'ratio3', 'ratio4', 'ratio5', 'ratio6',
+                         'length_difference1', 'length_difference2', 'tf_idf_word_match']
+                         # 'cosine', 'euclidean', 'manhattan', 'wordmoversdistance']
 
 
 def preprocess_tocsv(file_path):
-    df_old = pd.read_csv(file_path).dropna(axis=0)
+    df_old = pd.read_csv(file_path).fillna("")
     query_a = [data.text_to_wordlist(text) for text in df_old['question1'].values][0:500000]
     query_b = [data.text_to_wordlist(text) for text in df_old['question2'].values][0:500000]
 
@@ -94,16 +93,23 @@ def pre_split_train(out_feature, train_distance):
     outer_feature = np.array(pickle.load(open(out_feature, "rb")))
     train_distance = np.array(pickle.load(open(train_distance, "rb")))
 
+    print(outer_feature[0].shape)
+    print(outer_feature[1].shape)
+
+    outer_feature = np.concatenate((outer_feature[0], outer_feature[1]), axis=0)
+
+    print(outer_feature.shape)
+
     # random.shuffle(data)
     data_x = data[0:len(data), 0:2]
     data_y = data[0:len(data), 2:3]
     test_x, train_x = data_x[0:5000, :], data_x[5000:len(data_x), :]
     test_y, train_y = data_y[0:5000, :], data_y[5000:len(data_y), :]
 
-    test_cosine, train_cosine = train_distance[0:5000, 0:1], train_distance[5000:len(train_distance), 0:1]
-    test_euclidean, train_euclidean = train_distance[0:5000, 1:2], train_distance[5000:len(train_distance), 1:2]
-    test_manhattan, train_manhattan = train_distance[0:5000, 2:3], train_distance[5000:len(train_distance), 2:3]
-    test_wordmoversdistance, train_wordmoversdistance = train_distance[0:5000, 3:4], train_distance[5000:len(train_distance), 3:4]
+    # test_cosine, train_cosine = train_distance[0:5000, 0:1], train_distance[5000:len(train_distance), 0:1]
+    # test_euclidean, train_euclidean = train_distance[0:5000, 1:2], train_distance[5000:len(train_distance), 1:2]
+    # test_manhattan, train_manhattan = train_distance[0:5000, 2:3], train_distance[5000:len(train_distance), 2:3]
+    # test_wordmoversdistance, train_wordmoversdistanqce = train_distance[0:5000, 3:4], train_distance[5000:len(train_distance), 3:4]
 
     test_df = pd.DataFrame(data={'question1': np.squeeze(test_x[:, 0:1], axis=1),
                                  'question2': np.squeeze(test_x[:, 1:2], axis=1),
@@ -124,10 +130,10 @@ def pre_split_train(out_feature, train_distance):
                                  'length_difference1': np.squeeze(outer_feature[0:5000, 14:15], axis=1),
                                  'length_difference2': np.squeeze(outer_feature[0:5000, 15:16], axis=1),
                                  'tf_idf_word_match': np.squeeze(outer_feature[0:5000, 16:17], axis=1),
-                                 'cosine':  np.squeeze(test_cosine, axis=1),
-                                 'euclidean': np.squeeze(test_euclidean, axis=1),
-                                 'manhattan': np.squeeze(test_manhattan, axis=1),
-                                 'wordmoversdistance': np.squeeze(test_wordmoversdistance, axis=1),
+                                 # 'cosine':  np.squeeze(test_cosine, axis=1),
+                                 # 'euclidean': np.squeeze(test_euclidean, axis=1),
+                                 # 'manhattan': np.squeeze(test_manhattan, axis=1),
+                                 # 'wordmoversdistance': np.squeeze(test_wordmoversdistance, axis=1),
                                  'is_duplicate': np.squeeze(test_y, axis=1)},
                            columns=[columns])
 
@@ -150,10 +156,10 @@ def pre_split_train(out_feature, train_distance):
                                   'length_difference1': np.squeeze(outer_feature[5000:len(outer_feature), 14:15], axis=1),
                                   'length_difference2': np.squeeze(outer_feature[5000:len(outer_feature), 15:16], axis=1),
                                   'tf_idf_word_match': np.squeeze(outer_feature[5000:len(outer_feature), 16:17], axis=1),
-                                  'cosine': np.squeeze(train_cosine, axis=1),
-                                  'euclidean': np.squeeze(train_euclidean, axis=1),
-                                  'manhattan': np.squeeze(train_manhattan, axis=1),
-                                  'wordmoversdistance': np.squeeze(train_wordmoversdistance, axis=1),
+                                  # 'cosine': np.squeeze(train_cosine, axis=1),
+                                  # 'euclidean': np.squeeze(train_euclidean, axis=1),
+                                  # 'manhattan': np.squeeze(train_manhattan, axis=1),
+                                  # 'wordmoversdistance': np.squeeze(train_wordmoversdistance, axis=1),
                                   'is_duplicate': np.squeeze(train_y, axis=1)},
                             columns=[columns])
 
@@ -286,7 +292,7 @@ class data(object):
             print("vocab_processor 转化结束")
 
             context_ids = [list(range(len(vocab_processor.vocabulary_)))]
-            # print("number of words :", len(vocab_processor.vocabulary_))
+            print("number of words :", len(vocab_processor.vocabulary_))
             # print(vocab_processor.reverse(context_ids))
             # for article in vocab_processor.reverse(context_ids):
             #     for word in article.split():
@@ -323,4 +329,4 @@ if __name__ == '__main__':
     train_file = "./data/csv/train_train.csv"
     test_file = "./data/csv/train_test.csv"
     stop_words_file = "./data/stop_words_eng.txt"
-    pre_split_train("./data/feature.pkl", "./data/pkl/train_distance.pkl")
+    pre_split_train("./data/pkl/extra_feature.pkl", "./data/pkl/train_distance.pkl")

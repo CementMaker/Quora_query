@@ -96,7 +96,7 @@ class sentiment(object):
 
 class ManualFeatureExtraction(object):
     def __init__(self, feature_path, data_file, lr_path):
-        self.df = pd.read_csv(data_file).dropna()[['question1', 'question2']]
+        self.df = pd.read_csv(data_file).fillna("")[['question1', 'question2']]
         self.corpus = np.reshape(a=self.df.values,
                                  newshape=len(self.df.values) * 2)
 
@@ -108,7 +108,6 @@ class ManualFeatureExtraction(object):
             lowercase=False,
             decode_error='ignore',
         ).fit(self.corpus)
-
 
         print(self.df.values.shape)
         self.feature_path = feature_path
@@ -250,32 +249,30 @@ class distance(object):
                 print(number, "lines processed")
         return np.array(wordmoversdistance)
 
-
     def main(self):
         wordmoversdistance = self.WordMoversDistance()
         feature = np.array(list(zip(self.cosine, self.euclidean, self.manhattan, wordmoversdistance)))
         print(feature.shape)
-        pickle.dump(feature, open(pkl, "wb"))
+        pickle.dump(feature, open(self.pkl, "wb"))
         return feature
 
 
 
 if __name__ == '__main__':
     # pre_split_train()
-    data_file = "./data/csv/test.csv"
+    data_file = "./data/csv/train.csv"
     train_file = "./data/csv/train_train.csv"
     test_file = "./data/csv/train_test.csv"
     stop_words_file = "./data/stop_words_eng.txt"
     word2vecpath = "./data/word_vec/word2vec.model"
+    feature_path = "./data/feature.pkl"
+    lr_path = "./data/lr_sentiment.model"
     pkl = "./data/pkl/test_distance.pkl"
-
-
     # sentiment().xgbRegressionModel()
     # sentiment().logisticRegression()
 
-    # print(datetime.datetime.now().isoformat())
-    # print(datetime.datetime.now().isoformat())
-    # feature = ManualFeatureExtraction(data_file)
+    print(datetime.datetime.now().isoformat())
+    feature = ManualFeatureExtraction(feature_path, data_file, lr_path)
     # feature.main()
 
     distance(data_file, word2vecpath, pkl).main()
