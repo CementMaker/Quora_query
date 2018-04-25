@@ -54,15 +54,16 @@ class siamese_network_cnn(object):
     def __init__(self):
         # 定义CNN网络，对话窗口以及optimizer
         self.sess = tf.Session()
-        self.Model = Model(sequence_length=50,
-                           vocab_size=73300,
-                           embedding_size=100,
+        self.Model = Model(sequence_length=60,
+                           vocab_size=33300,
+                           embedding_size=128,
                            filter_sizes=[1, 2, 3, 4, 5, 6],
                            num_filters=100,
                            num_layers=1,
-                           rnn_size=100)
+                           rnn_size=128,
+                           batch_size=1000)
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        self.optimizer = tf.train.AdamOptimizer(0.001).minimize(self.Model.loss, global_step=self.global_step)
+        self.optimizer = tf.train.AdamOptimizer(0.0005).minimize(self.Model.loss, global_step=self.global_step)
         self.sess.run(tf.global_variables_initializer())
 
         # 训练数据测试数据的获取，但是好像有点问题
@@ -96,16 +97,7 @@ class siamese_network_cnn(object):
         print("*****************************************************************************")
 
         # 获取训练数据迭代器并且获取测试数据（用于神经网络验证）
-        self.batches = data.get_batch(7, 500, self.train_data, self.train_feature, self.train_label)
-        # data_double, label_double, feature_double = [], [], []
-        # for (d, l, f) in zip(self.test_data, self.test_label, self.test_feature):
-        #     if l == 0 and random.random() <= 0.5667:
-        #         data_double.append(d)
-        #         label_double.append(l)
-        #         feature_double.append(f)
-        # self.test_data = np.append(self.test_data, data_double, axis=0)
-        # self.test_label = np.append(self.test_label, label_double)
-        # self.test_feature = np.append(self.test_feature, feature_double, axis=0)
+        self.batches = data.get_batch(7, 1000, self.train_data, self.train_feature, self.train_label)
         self.test_a, self.test_b, self.y_test = function.dev_data(self.test_data, self.test_label)
 
         # 获取test数据
@@ -120,7 +112,7 @@ class siamese_network_cnn(object):
 
         # tensorboard
         tf.summary.scalar("loss", self.Model.loss)
-        tf.summary.scalar("log_loss", self.Model.log_loss)
+        # tf.summary.scalar("log_loss", self.Model.log_loss)
         tf.summary.scalar("accuracy", self.Model.accuracy)
         self.merged_summary_op_train = tf.summary.merge_all()
         self.merged_summary_op_test = tf.summary.merge_all()
@@ -142,13 +134,12 @@ class siamese_network_cnn(object):
             self.Model.dropout_keep_prob: 1.0,
             self.Model.label: label
         }
-        _, summary, step, log_loss, loss, accuracy = self.sess.run(
-            [self.optimizer, self.merged_summary_op_train, self.global_step,
-             self.Model.log_loss, self.Model.loss, self.Model.accuracy],
+        _, summary, step, loss, accuracy = self.sess.run(
+            [self.optimizer, self.merged_summary_op_train, self.global_step, self.Model.loss, self.Model.accuracy],
             feed_dict=feed_dict)
         self.summary_writer_train.add_summary(summary, step)
         time_str = datetime.datetime.now().isoformat()
-        print("{}: step {}, loss {:g}, log_loss {:g} accuracy {}".format(time_str, step, loss, log_loss, accuracy))
+        print("{}: step {}, loss {:g} accuracy {}".format(time_str, step, loss, accuracy))
         self.train_loss.append(loss)
         self.train_accuracy.append(accuracy)
 
@@ -169,7 +160,7 @@ class siamese_network_cnn(object):
             self.Model.label: label
         }
         log_loss, summary, step, acc, predict = self.sess.run(
-            fetches=[self.Model.log_loss, self.merged_summary_op_test,
+            fetches=[self.Model.loss, self.merged_summary_op_test,
                      self.global_step, self.Model.accuracy, self.Model.predict],
             feed_dict=feed_dict
         )
@@ -226,8 +217,8 @@ class siamese_network_cnn(object):
                 print("\nEvaluation:")
                 self.dev_step(self.test_a, self.test_b, self.test_feature, self.y_test)
                 print("")
-        self.draw_chart()
 
+        # self.draw_chart()
         # 将测试集拿出来训练
         # if flag is True:
         #     self.batches = data.get_batch(7, 1500, zip(self.test_a, self.test_b), self.y_test)

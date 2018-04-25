@@ -96,7 +96,7 @@ class sentiment(object):
 
 class ManualFeatureExtraction(object):
     def __init__(self, feature_path, data_file, lr_path):
-        self.df = pd.read_csv(data_file).fillna("")[['question1', 'question2']]
+        self.df = pd.read_csv(data_file).dropna()[['question1', 'question2']]
         self.corpus = np.reshape(a=self.df.values,
                                  newshape=len(self.df.values) * 2)
 
@@ -222,17 +222,17 @@ class distance(object):
             decode_error='ignore'
         ).fit(self.vectorizer_corpus)
 
-        self.x = np.squeeze(pd.read_csv(data_path)[['question1']].fillna("").values, axis=1)
-        self.y = np.squeeze(pd.read_csv(data_path)[['question2']].fillna("").values, axis=1)
+        self.x = np.squeeze(pd.read_csv(data_path).dropna()[['question1']].values, axis=1)
+        self.y = np.squeeze(pd.read_csv(data_path).dropna()[['question2']].values, axis=1)
 
         self.X = self.vectorizer.transform(self.x)
         self.Y = self.vectorizer.transform(self.y)
         self.cosine = pairwise.paired_cosine_distances(self.X, self.Y)
         self.euclidean = pairwise.paired_euclidean_distances(self.X, self.Y)
         self.manhattan = pairwise.paired_manhattan_distances(self.X, self.Y)
-        print(self.cosine.shape)
-        print(self.euclidean.shape)
-        print(self.manhattan.shape)
+        print("self.cosine.shape:", self.cosine.shape)
+        print("self.euclidean.shape:", self.euclidean.shape)
+        print("self.manhattan.shape:", self.manhattan.shape)
 
     def WordMoversDistance(self):
         number = 0
@@ -250,9 +250,25 @@ class distance(object):
         return np.array(wordmoversdistance)
 
     def main(self):
+        # feature = ManualFeatureExtraction(
+        #     feature_path="./data/feature.pkl",
+        #     data_file="./data/csv/train.csv",
+        #     lr_path="./data/lr_sentiment.model"
+        # ).main()
+        feature = np.array(pickle.load(open("./data/feature.pkl", "rb")))
+        print("feature.shape:", feature.shape)
         wordmoversdistance = self.WordMoversDistance()
-        feature = np.array(list(zip(self.cosine, self.euclidean, self.manhattan, wordmoversdistance)))
-        print(feature.shape)
+
+        all = [feature,
+               np.expand_dims(self.cosine, -1),
+               np.expand_dims(self.euclidean, -1),
+               np.expand_dims(self.manhattan, -1),
+               np.expand_dims(wordmoversdistance, -1)]
+        for index in all:
+            print(index.shape)
+
+        feature = np.concatenate(all, axis=1)
+        print("feature.shape:", feature.shape)
         pickle.dump(feature, open(self.pkl, "wb"))
         return feature
 
@@ -267,12 +283,12 @@ if __name__ == '__main__':
     word2vecpath = "./data/word_vec/word2vec.model"
     feature_path = "./data/feature.pkl"
     lr_path = "./data/lr_sentiment.model"
-    pkl = "./data/pkl/test_distance.pkl"
+    pkl = "./data/pkl/train_feature.pkl"
     # sentiment().xgbRegressionModel()
     # sentiment().logisticRegression()
 
     print(datetime.datetime.now().isoformat())
-    feature = ManualFeatureExtraction(feature_path, data_file, lr_path)
+    # feature = ManualFeatureExtraction(feature_path, data_file, lr_path)
     # feature.main()
 
     distance(data_file, word2vecpath, pkl).main()

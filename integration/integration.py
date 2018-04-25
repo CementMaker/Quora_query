@@ -63,11 +63,13 @@ class Model(object):
         :param batch_size: batch 的size大小
         :return: 对比损失
         '''
+        print("*******************", y)
+        print("*******************", d)
         tmp = y * tf.square(d)
         tmp2 = (1 - y) * tf.square(tf.maximum((1 - d), 0))
         return tf.reduce_sum(tmp + tmp2) / batch_size / 2
 
-    def __init__(self, sequence_length, vocab_size, embedding_size, filter_sizes, num_filters, num_layers, rnn_size):
+    def __init__(self, sequence_length, vocab_size, embedding_size, filter_sizes, num_filters, num_layers, rnn_size, batch_size):
         self.label = tf.placeholder(tf.float32, [None, ], name="label")
         self.outer_feature = tf.placeholder(tf.float32, [None, 17], name="outer_feature")
         self.input_sentence_a = tf.placeholder(tf.int32, [None, sequence_length], name="input_a")
@@ -116,47 +118,25 @@ class Model(object):
             self.h_pool_flat_a = tf.squeeze(self.h_pool_a, axis=[1, 2])
             self.h_pool_flat_b = tf.squeeze(self.h_pool_b, axis=[1, 2])
 
-            self.lstm_diff = self.out1 - self.out2
-            self.lstm_mul = tf.multiply(self.out1, self.out2)
-            self.cnn_diff = self.h_pool_flat_a - self.h_pool_flat_b
-            self.cnn_mul = tf.multiply(self.h_pool_flat_a, self.h_pool_flat_b)
-
-            self.feature = tf.concat(
-                values=[self.cnn_diff, self.cnn_mul,
-                        self.h_pool_flat_a, self.h_pool_flat_b, self.outer_feature,
-                        self.lstm_diff, self.lstm_mul, self.out1, self.out2],
-                axis=1
-            )
-            self.feature_drop = tf.nn.dropout(self.feature, keep_prob=self.dropout_keep_prob)
-            self.weight = tf.Variable(tf.truncated_normal(
-                shape=[rnn_size * 8 + num_filters * len(filter_sizes) * 4 + 17, 1],
-                stddev=0.1,
-                mean=0.0)
-            )
-            self.bias = tf.Variable(tf.truncated_normal(shape=[1], stddev=0.1, mean=0.0))
-            self.result = tf.nn.xw_plus_b(self.feature, self.weight, self.bias)
-            self.logits = tf.nn.sigmoid(self.result)
-            self.ans = tf.squeeze(self.logits, axis=1)
-
         with tf.name_scope("loss"):
-            # log_loss
-            # tf.nn.softmax_cross_entropy_with_logits:
-            #   先计算logits的softmax函数值，如果Logits就是一个概率分布，会带来loss并不是实际loss的问题
-            self.l2_loss = self.l2_loss + tf.nn.l2_loss(self.weight) + tf.nn.l2_loss(self.bias)
-            self.log_loss = tf.losses.log_loss(labels=self.label, predictions=self.ans)
-            self.loss = self.log_loss  # + 0.001 * self.l2_loss
+            self.feature_a = tf.concat((self.out1, self.h_pool_flat_a), axis=1)
+            self.feature_b = tf.concat((self.out2, self.h_pool_flat_b), axis=1)
+            self.distance = self.cosine_half_sita_square(self.feature_a, self.feature_b)
+            print(self.distance)
+            self.loss = self.contrastive_loss(self.label, self.distance, batch_size)
 
         with tf.name_scope("accuracy"):
-            self.predict = tf.rint(self.ans)
+            self.predict = 1 - tf.rint(self.distance)
             self.tmp_sim = tf.equal(tf.cast(self.predict, tf.int64), tf.cast(self.label, tf.int64))
             self.accuracy = tf.reduce_mean(tf.cast(self.tmp_sim, tf.float32))
 
-        values = [self.cnn_diff, self.cnn_mul,
-                  self.h_pool_flat_a, self.h_pool_flat_b, self.outer_feature,
-                  self.lstm_diff, self.lstm_mul, self.out1, self.out2]
-        for index in values:
-            print(index)
-
+        print(self.feature_a)
+        print(self.feature_b)
+        print(self.distance)
+        print(self.loss)
+        print(self.predict)
+        print(self.tmp_sim)
+        print(self.accuracy)
 
     @staticmethod
     def conv(inputs, filter, strides, padding):
@@ -191,11 +171,12 @@ class Model(object):
         :param feature_b: 特征b, shape = [?, length]
         :return: 两个向量归一化后的欧式距离（或者是 1 - 相似度）
         '''
-        euclidean_distance = tf.square(tf.reduce_sum(tf.subtract(feature_a, feature_b), axis=1))
+        euclidean_distance = tf.sqrt(tf.reduce_sum(tf.square(feature_a - feature_b), axis=1))
         euclidean_distance_norm = tf.div(euclidean_distance,
-                                         tf.add(tf.sqrt(tf.reduce_sum(tf.square(feature_a), 1, keep_dims=True)),
-                                                tf.sqrt(tf.reduce_sum(tf.square(feature_b), 1, keep_dims=True))))
-        euclidean_distance_norm = tf.reshape(euclidean_distance_norm, [-1])
+                                         tf.add(tf.sqrt(tf.reduce_sum(tf.square(feature_a), 1)),
+                                                tf.sqrt(tf.reduce_sum(tf.square(feature_b), 1))))
+        # euclidean_distance_norm = tf.reshape(euclidean_distance_norm, [-1])
+        print("￥￥￥￥￥￥￥￥￥￥￥￥", euclidean_distance_norm)
         return euclidean_distance_norm
 
     @staticmethod
@@ -226,5 +207,6 @@ class Model(object):
 #             filter_sizes=[1, 2, 3, 4, 5],
 #             num_filters=20,
 #             num_layers=1,
-#             rnn_size=40)
+#             rnn_size=40,
+#             batch_size=100)
 

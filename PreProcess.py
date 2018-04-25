@@ -92,24 +92,98 @@ def pre_split_train(out_feature, train_distance):
     # 获取句子的extra feature
     outer_feature = np.array(pickle.load(open(out_feature, "rb")))
     train_distance = np.array(pickle.load(open(train_distance, "rb")))
-
-    print(outer_feature[0].shape)
-    print(outer_feature[1].shape)
-
     outer_feature = np.concatenate((outer_feature[0], outer_feature[1]), axis=0)
 
-    print(outer_feature.shape)
-
-    # random.shuffle(data)
+    # np.random.shuffle(data)
     data_x = data[0:len(data), 0:2]
     data_y = data[0:len(data), 2:3]
     test_x, train_x = data_x[0:5000, :], data_x[5000:len(data_x), :]
     test_y, train_y = data_y[0:5000, :], data_y[5000:len(data_y), :]
 
-    # test_cosine, train_cosine = train_distance[0:5000, 0:1], train_distance[5000:len(train_distance), 0:1]
-    # test_euclidean, train_euclidean = train_distance[0:5000, 1:2], train_distance[5000:len(train_distance), 1:2]
-    # test_manhattan, train_manhattan = train_distance[0:5000, 2:3], train_distance[5000:len(train_distance), 2:3]
-    # test_wordmoversdistance, train_wordmoversdistanqce = train_distance[0:5000, 3:4], train_distance[5000:len(train_distance), 3:4]
+    test_cosine, train_cosine = train_distance[0:5000, 0:1], train_distance[5000:len(train_distance), 0:1]
+    test_euclidean, train_euclidean = train_distance[0:5000, 1:2], train_distance[5000:len(train_distance), 1:2]
+    test_manhattan, train_manhattan = train_distance[0:5000, 2:3], train_distance[5000:len(train_distance), 2:3]
+    test_wordmoversdistance, train_wordmoversdistance = train_distance[0:5000, 3:4], train_distance[5000:len(train_distance), 3:4]
+
+    Data = {'question1': np.squeeze(data[:, 0:1], axis=1),
+            'question2': np.squeeze(data[:, 1:2], axis=1),
+            'lcs': np.squeeze(outer_feature[:, 13:14], axis=1),
+            'edit_distance': np.squeeze(outer_feature[:, 0:1], axis=1),
+            'sentiment1': np.squeeze(outer_feature[:, 1:2], axis=1),
+            'sentiment2': np.squeeze(outer_feature[:, 2:3], axis=1),
+            'sentiment3': np.squeeze(outer_feature[:, 3:4], axis=1),
+            'sentiment4': np.squeeze(outer_feature[:, 4:5], axis=1),
+            'sentiment5': np.squeeze(outer_feature[:, 5:6], axis=1),
+            'sentiment6': np.squeeze(outer_feature[:, 6:7], axis=1),
+            'ratio1': np.squeeze(outer_feature[:, 7:8], axis=1),
+            'ratio2': np.squeeze(outer_feature[:, 8:9], axis=1),
+            'ratio3': np.squeeze(outer_feature[:, 9:10], axis=1),
+            'ratio4': np.squeeze(outer_feature[:, 10:11], axis=1),
+            'ratio5': np.squeeze(outer_feature[:, 11:12], axis=1),
+            'ratio6': np.squeeze(outer_feature[:, 12:13], axis=1),
+            'length_difference1': np.squeeze(outer_feature[:, 14:15], axis=1),
+            'length_difference2': np.squeeze(outer_feature[:, 15:16], axis=1),
+            'tf_idf_word_match': np.squeeze(outer_feature[:, 16:17], axis=1),
+            'cosine': np.squeeze(train_distance[:, 0:1], axis=1),
+            'euclidean': np.squeeze(train_distance[:, 1:2], axis=1),
+            'manhattan': np.squeeze(train_distance[:, 2:3], axis=1),
+            'wordmoversdistance': np.squeeze(train_distance[:, 3:4], axis=1),
+            'is_duplicate': np.squeeze(data[:, 2:3], axis=1)}
+    for key, value in Data.items():
+        print(value.shape)
+
+    df = pd.DataFrame(data={'question1': np.squeeze(data[:, 0:1], axis=1),
+                            'question2': np.squeeze(data[:, 1:2], axis=1),
+                            'lcs': np.squeeze(outer_feature[:, 13:14], axis=1),
+                            'edit_distance': np.squeeze(outer_feature[:, 0:1], axis=1),
+                            'sentiment1': np.squeeze(outer_feature[:, 1:2], axis=1),
+                            'sentiment2': np.squeeze(outer_feature[:, 2:3], axis=1),
+                            'sentiment3': np.squeeze(outer_feature[:, 3:4], axis=1),
+                            'sentiment4': np.squeeze(outer_feature[:, 4:5], axis=1),
+                            'sentiment5': np.squeeze(outer_feature[:, 5:6], axis=1),
+                            'sentiment6': np.squeeze(outer_feature[:, 6:7], axis=1),
+                            'ratio1': np.squeeze(outer_feature[:, 7:8], axis=1),
+                            'ratio2': np.squeeze(outer_feature[:, 8:9], axis=1),
+                            'ratio3': np.squeeze(outer_feature[:, 9:10], axis=1),
+                            'ratio4': np.squeeze(outer_feature[:, 10:11], axis=1),
+                            'ratio5': np.squeeze(outer_feature[:, 11:12], axis=1),
+                            'ratio6': np.squeeze(outer_feature[:, 12:13], axis=1),
+                            'length_difference1': np.squeeze(outer_feature[:, 14:15], axis=1),
+                            'length_difference2': np.squeeze(outer_feature[:, 15:16], axis=1),
+                            'tf_idf_word_match': np.squeeze(outer_feature[:, 16:17], axis=1),
+                            'cosine': np.squeeze(train_distance[:, 0:1], axis=1),
+                            'euclidean': np.squeeze(train_distance[:, 1:2], axis=1),
+                            'manhattan': np.squeeze(train_distance[:, 2:3], axis=1),
+                            'wordmoversdistance': np.squeeze(train_distance[:, 3:4], axis=1),
+                            'is_duplicate': np.squeeze(data[:, 2:3], axis=1)},
+                      columns=[columns])
+
+    Data = {'question1': np.squeeze(test_x[:, 0:1], axis=1),
+            'question2': np.squeeze(test_x[:, 1:2], axis=1),
+            'lcs': np.squeeze(outer_feature[0:5000, 13:14], axis=1),
+            'edit_distance': np.squeeze(outer_feature[0:5000, 0:1], axis=1),
+            'sentiment1': np.squeeze(outer_feature[0:5000, 1:2], axis=1),
+            'sentiment2': np.squeeze(outer_feature[0:5000, 2:3], axis=1),
+            'sentiment3': np.squeeze(outer_feature[0:5000, 3:4], axis=1),
+            'sentiment4': np.squeeze(outer_feature[0:5000, 4:5], axis=1),
+            'sentiment5': np.squeeze(outer_feature[0:5000, 5:6], axis=1),
+            'sentiment6': np.squeeze(outer_feature[0:5000, 6:7], axis=1),
+            'ratio1': np.squeeze(outer_feature[0:5000, 7:8], axis=1),
+            'ratio2': np.squeeze(outer_feature[0:5000, 8:9], axis=1),
+            'ratio3': np.squeeze(outer_feature[0:5000, 9:10], axis=1),
+            'ratio4': np.squeeze(outer_feature[0:5000, 10:11], axis=1),
+            'ratio5': np.squeeze(outer_feature[0:5000, 11:12], axis=1),
+            'ratio6': np.squeeze(outer_feature[0:5000, 12:13], axis=1),
+            'length_difference1': np.squeeze(outer_feature[0:5000, 14:15], axis=1),
+            'length_difference2': np.squeeze(outer_feature[0:5000, 15:16], axis=1),
+            'tf_idf_word_match': np.squeeze(outer_feature[0:5000, 16:17], axis=1),
+            'cosine': np.squeeze(test_cosine, axis=1),
+            'euclidean': np.squeeze(test_euclidean, axis=1),
+            'manhattan': np.squeeze(test_manhattan, axis=1),
+            'wordmoversdistance': np.squeeze(test_wordmoversdistance, axis=1),
+            'is_duplicate': np.squeeze(test_y, axis=1)}
+    for key, value in Data.items():
+        print(value.shape)
 
     test_df = pd.DataFrame(data={'question1': np.squeeze(test_x[:, 0:1], axis=1),
                                  'question2': np.squeeze(test_x[:, 1:2], axis=1),
@@ -130,12 +204,39 @@ def pre_split_train(out_feature, train_distance):
                                  'length_difference1': np.squeeze(outer_feature[0:5000, 14:15], axis=1),
                                  'length_difference2': np.squeeze(outer_feature[0:5000, 15:16], axis=1),
                                  'tf_idf_word_match': np.squeeze(outer_feature[0:5000, 16:17], axis=1),
-                                 # 'cosine':  np.squeeze(test_cosine, axis=1),
-                                 # 'euclidean': np.squeeze(test_euclidean, axis=1),
-                                 # 'manhattan': np.squeeze(test_manhattan, axis=1),
-                                 # 'wordmoversdistance': np.squeeze(test_wordmoversdistance, axis=1),
+                                 'cosine':  np.squeeze(test_cosine, axis=1),
+                                 'euclidean': np.squeeze(test_euclidean, axis=1),
+                                 'manhattan': np.squeeze(test_manhattan, axis=1),
+                                 'wordmoversdistance': np.squeeze(test_wordmoversdistance, axis=1),
                                  'is_duplicate': np.squeeze(test_y, axis=1)},
                            columns=[columns])
+
+    Data = {'question1': np.squeeze(train_x[:, 0:1], axis=1),
+            'question2': np.squeeze(train_x[:, 1:2], axis=1),
+            'lcs': np.squeeze(outer_feature[5000:len(outer_feature), 13:14], axis=1),
+            'edit_distance': np.squeeze(outer_feature[5000:len(outer_feature), 0:1], axis=1),
+            'sentiment1': np.squeeze(outer_feature[5000:len(outer_feature), 1:2], axis=1),
+            'sentiment2': np.squeeze(outer_feature[5000:len(outer_feature), 2:3], axis=1),
+            'sentiment3': np.squeeze(outer_feature[5000:len(outer_feature), 3:4], axis=1),
+            'sentiment4': np.squeeze(outer_feature[5000:len(outer_feature), 4:5], axis=1),
+            'sentiment5': np.squeeze(outer_feature[5000:len(outer_feature), 5:6], axis=1),
+            'sentiment6': np.squeeze(outer_feature[5000:len(outer_feature), 6:7], axis=1),
+            'ratio1': np.squeeze(outer_feature[5000:len(outer_feature), 7:8], axis=1),
+            'ratio2': np.squeeze(outer_feature[5000:len(outer_feature), 8:9], axis=1),
+            'ratio3': np.squeeze(outer_feature[5000:len(outer_feature), 9:10], axis=1),
+            'ratio4': np.squeeze(outer_feature[5000:len(outer_feature), 10:11], axis=1),
+            'ratio5': np.squeeze(outer_feature[5000:len(outer_feature), 11:12], axis=1),
+            'ratio6': np.squeeze(outer_feature[5000:len(outer_feature), 12:13], axis=1),
+            'length_difference1': np.squeeze(outer_feature[5000:len(outer_feature), 14:15], axis=1),
+            'length_difference2': np.squeeze(outer_feature[5000:len(outer_feature), 15:16], axis=1),
+            'tf_idf_word_match': np.squeeze(outer_feature[5000:len(outer_feature), 16:17], axis=1),
+            'cosine': np.squeeze(train_cosine, axis=1),
+            'euclidean': np.squeeze(train_euclidean, axis=1),
+            'manhattan': np.squeeze(train_manhattan, axis=1),
+            'wordmoversdistance': np.squeeze(train_wordmoversdistance, axis=1),
+            'is_duplicate': np.squeeze(train_y, axis=1)}
+    for key, value in Data.items():
+        print(value.shape)
 
     train_df = pd.DataFrame(data={'question1': np.squeeze(train_x[:, 0:1], axis=1),
                                   'question2': np.squeeze(train_x[:, 1:2], axis=1),
@@ -156,18 +257,18 @@ def pre_split_train(out_feature, train_distance):
                                   'length_difference1': np.squeeze(outer_feature[5000:len(outer_feature), 14:15], axis=1),
                                   'length_difference2': np.squeeze(outer_feature[5000:len(outer_feature), 15:16], axis=1),
                                   'tf_idf_word_match': np.squeeze(outer_feature[5000:len(outer_feature), 16:17], axis=1),
-                                  # 'cosine': np.squeeze(train_cosine, axis=1),
-                                  # 'euclidean': np.squeeze(train_euclidean, axis=1),
-                                  # 'manhattan': np.squeeze(train_manhattan, axis=1),
-                                  # 'wordmoversdistance': np.squeeze(train_wordmoversdistance, axis=1),
+                                  'cosine': np.squeeze(train_cosine, axis=1),
+                                  'euclidean': np.squeeze(train_euclidean, axis=1),
+                                  'manhattan': np.squeeze(train_manhattan, axis=1),
+                                  'wordmoversdistance': np.squeeze(train_wordmoversdistance, axis=1),
                                   'is_duplicate': np.squeeze(train_y, axis=1)},
                             columns=[columns])
 
     print("写入csv数据。。。")
+    df.to_csv("./train.csv")
     test_df.to_csv("./data/csv/train_test.csv", columns=columns)
     train_df.to_csv("./data/csv/train_train.csv", columns=columns)
     print("写入csv数据成功！！！")
-
 
 
 def remove_stop_words(sentence, stop_words_set):
@@ -278,7 +379,7 @@ class data(object):
             self.test_data = [self.text_to_wordlist(line) for line in self.test_data]
 
             # 转化成数据，将词汇进行编号
-            vocab_processor = learn.preprocessing.VocabularyProcessor(50, min_frequency=5)
+            vocab_processor = learn.preprocessing.VocabularyProcessor(60, min_frequency=5)
             vocab_processor = vocab_processor.fit(x_text)
             print("vocab_processor 训练结束")
 
@@ -291,8 +392,8 @@ class data(object):
             self.vec_test = [(self.vec_test[index], self.vec_test[index + 1]) for index in range(0, len(self.vec_test), 2)]
             print("vocab_processor 转化结束")
 
-            context_ids = [list(range(len(vocab_processor.vocabulary_)))]
             print("number of words :", len(vocab_processor.vocabulary_))
+            context_ids = [list(range(len(vocab_processor.vocabulary_)))]
             # print(vocab_processor.reverse(context_ids))
             # for article in vocab_processor.reverse(context_ids):
             #     for word in article.split():
