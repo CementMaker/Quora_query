@@ -25,7 +25,7 @@ class Model(object):
             stacked_rnn_fw = []
             for _ in range(n_layers):
                 fw_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden)
-                # stm_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=1)
+                stm_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=0.5)
                 stacked_rnn_fw.append(fw_cell)
             lstm_fw_cell_m = tf.nn.rnn_cell.MultiRNNCell(cells=stacked_rnn_fw, state_is_tuple=True)
 
@@ -33,7 +33,7 @@ class Model(object):
             stacked_rnn_bw = []
             for _ in range(n_layers):
                 bw_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden)
-                # stm_cell = tf.contrib.rnn.DropoutWrapper(bw_cell, output_keep_prob=1)
+                stm_cell = tf.contrib.rnn.DropoutWrapper(bw_cell, output_keep_prob=0.5)
                 stacked_rnn_bw.append(bw_cell)
             lstm_bw_cell_m = tf.nn.rnn_cell.MultiRNNCell(cells=stacked_rnn_bw, state_is_tuple=True)
 
@@ -63,8 +63,6 @@ class Model(object):
         :param batch_size: batch 的size大小
         :return: 对比损失
         '''
-        print("*******************", y)
-        print("*******************", d)
         tmp = y * tf.square(d)
         tmp2 = (1 - y) * tf.square(tf.maximum((1 - d), 0))
         return tf.reduce_sum(tmp + tmp2) / batch_size / 2
@@ -78,20 +76,29 @@ class Model(object):
         self.l2_loss = 0
 
         with tf.name_scope("embedding_layer"):
-            self.W = tf.Variable(tf.truncated_normal(shape=[vocab_size, embedding_size],
+            self.W1 = tf.Variable(tf.truncated_normal(shape=[vocab_size, embedding_size],
                                                      dtype=tf.float32,
                                                      stddev=0.1,
                                                      mean=0.0), name="W")
-            self.embedded_a = tf.nn.embedding_lookup(params=self.W, ids=self.input_sentence_a)
-            self.embedded_b = tf.nn.embedding_lookup(params=self.W, ids=self.input_sentence_b)
+
+            self.W2 = tf.Variable(tf.truncated_normal(shape=[vocab_size, embedding_size],
+                                                     dtype=tf.float32,
+                                                     stddev=0.1,
+                                                     mean=0.0), name="W")
+
+            self.embedded_a_cnn = tf.nn.embedding_lookup(params=self.W1, ids=self.input_sentence_a)
+            self.embedded_b_cnn = tf.nn.embedding_lookup(params=self.W1, ids=self.input_sentence_b)
+
+            self.embedded_a_rnn = tf.nn.embedding_lookup(params=self.W1, ids=self.input_sentence_a)
+            self.embedded_b_rnn = tf.nn.embedding_lookup(params=self.W1, ids=self.input_sentence_b)
 
             # 循环神经网络的输入
-            self.inputs_a = tf.unstack(self.embedded_a, axis=1)
-            self.inputs_b = tf.unstack(self.embedded_b, axis=1)
+            self.inputs_a = tf.unstack(self.embedded_a_rnn, axis=1)
+            self.inputs_b = tf.unstack(self.embedded_b_rnn, axis=1)
 
             # CNN输入
-            self.embedded_a_expand = tf.expand_dims(input=self.embedded_a, axis=-1)
-            self.embedded_b_expand = tf.expand_dims(input=self.embedded_b, axis=-1)
+            self.embedded_a_expand = tf.expand_dims(input=self.embedded_a_cnn, axis=-1)
+            self.embedded_b_expand = tf.expand_dims(input=self.embedded_b_cnn, axis=-1)
 
         pooled_outputs_a = []
         pooled_outputs_b = []
@@ -162,7 +169,7 @@ class Model(object):
             x=similarity,
             y=tf.multiply(tf.sqrt(tf.reduce_sum(feature_a * feature_a, axis=1)),
                           tf.sqrt(tf.reduce_sum(feature_b * feature_b, axis=1))))
-        return (similarity + 1) / 2
+        return tf.sqrt((similarity + 1) / 2)
 
     @staticmethod
     def euclidean_distance_normalization(feature_a, feature_b):
