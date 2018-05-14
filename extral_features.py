@@ -88,9 +88,12 @@ class sentiment(object):
         print(self.train_x.shape)
         print(self.train_y.shape)
         self.lr = LogisticRegression(n_jobs=4).fit(self.train_x, self.train_y)
-        y_pred_lr = self.lr.predict(self.test_x)
-        print(classification_report(y_true=np.expand_dims(self.test_y, axis=-1),
-                                    y_pred=y_pred_lr))
+        y_pred_lr = self.lr.predict_proba(self.test_x)
+
+        for line in y_pred_lr:
+            print(line)
+        # print(classification_report(y_true=np.expand_dims(self.test_y, axis=-1),
+        #                             y_pred=y_pred_lr))
         joblib.dump(self.lr, self.lr_path)
 
 
@@ -250,12 +253,27 @@ class distance(object):
         return np.array(wordmoversdistance)
 
     def main(self):
+        feature = ManualFeatureExtraction(
+            feature_path="./data/feature.pkl",
+            data_file="./data/csv/train.csv",
+            lr_path="./data/lr_sentiment.model"
+        ).main()
+        # feature = np.array(pickle.load(open("./data/feature.pkl", "rb")))
+        print("feature.shape:", feature.shape)
         wordmoversdistance = self.WordMoversDistance()
-        feature = np.array(list(zip(self.cosine, self.euclidean, self.manhattan, wordmoversdistance)))
-        print(feature.shape)
+
+        all = [feature,
+               np.expand_dims(self.cosine, -1),
+               np.expand_dims(self.euclidean, -1),
+               np.expand_dims(self.manhattan, -1),
+               np.expand_dims(wordmoversdistance, -1)]
+        for index in all:
+            print(index.shape)
+
+        feature = np.concatenate(all, axis=1)
+        print("feature.shape:", feature.shape)
         pickle.dump(feature, open(self.pkl, "wb"))
         return feature
-
 
 
 if __name__ == '__main__':
@@ -267,13 +285,16 @@ if __name__ == '__main__':
     word2vecpath = "./data/word_vec/word2vec.model"
     feature_path = "./data/feature.pkl"
     lr_path = "./data/lr_sentiment.model"
-    pkl = "./data/pkl/test_distance.pkl"
+    pkl = "./data/pkl/train_feature.pkl"
     # sentiment().xgbRegressionModel()
-    # sentiment().logisticRegression()
+    sentiment(
+        twitter_path="./data/csv/Tweets.csv",
+        lr_path="./data/lr_sentiment.model",
+        xgboost_path="./data/xgb_sentiment.model"
+    ).logisticRegression()
 
-    print(datetime.datetime.now().isoformat())
-    feature = ManualFeatureExtraction(feature_path, data_file, lr_path)
+    # print(datetime.datetime.now().isoformat())
+    # feature = ManualFeatureExtraction(feature_path, data_file, lr_path)
     # feature.main()
 
-    distance(data_file, word2vecpath, pkl).main()
-
+    # distance(data_file, word2vecpath, pkl).main()

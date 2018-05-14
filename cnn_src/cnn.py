@@ -1,15 +1,17 @@
 import os
 import tensorflow as tf
 
+from sklearn.ensemble import RandomForestClassifier
+
 os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 
 class Cnn(object):
-    def __init__(self, sequence_length, vocab_size, embedding_size, filter_sizes, num_filters, batch_size):
+    def __init__(self, sequence_length, vocab_size, embedding_size, filter_sizes, num_filters, outer_feature_size):
         self.label = tf.placeholder(tf.float32, [None, ], name="label")
-        self.outer_feature = tf.placeholder(tf.float32, [None, 17], name="outer_feature")
         self.input_sentence_a = tf.placeholder(tf.int32, [None, sequence_length], name="input_a")
         self.input_sentence_b = tf.placeholder(tf.int32, [None, sequence_length], name="input_b")
+        self.outer_feature = tf.placeholder(tf.int32, [None, outer_feature_size])
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         self.l2_loss = 0
 
@@ -47,24 +49,26 @@ class Cnn(object):
             self.mul = tf.multiply(self.h_pool_flat_a, self.h_pool_flat_b)
 
             self.feature = tf.concat(
-                values=[self.diff, self.mul, self.h_pool_flat_a, self.h_pool_flat_b, self.outer_feature], axis=1)
-            self.feature_drop = tf.nn.dropout(self.feature, keep_prob=self.dropout_keep_prob)
-            self.weight = tf.Variable(tf.truncated_normal(shape=[num_filters * len(filter_sizes) * 4 + 17, 1],
+                values=[self.diff, self.mul, self.h_pool_flat_a, self.h_pool_flat_b, self.outer_feature],
+                axis=1)
+            self.weight = tf.Variable(tf.truncated_normal(shape=[num_filters * len(filter_sizes) * 4 + 20, 2],
                                                           stddev=0.1,
                                                           mean=0.0))
-            self.bias = tf.Variable(tf.truncated_normal(shape=[1], stddev=0.1, mean=0.0))
-            self.result = tf.nn.xw_plus_b(self.feature_drop, self.weight, self.bias)
-            self.logits = tf.nn.sigmoid(self.result)
-            self.ans = tf.squeeze(self.logits, axis=1)
+            self.bias = tf.Variable(tf.truncated_normal(shape=[2], stddev=0.1, mean=0.0))
+            self.result = tf.nn.xw_plus_b(self.feature, self.weight, self.bias)
+            self.logits = tf.nn.softmax(self.result, axis=1)
 
         with tf.name_scope("loss"):
+            self.labels = tf.concat((tf.expand_dims(1 - self.label, axis=-1),
+                                     tf.expand_dims(self.label, axis=-1)), axis=1)
             self.l2_loss = self.l2_loss + tf.nn.l2_loss(self.weight) + tf.nn.l2_loss(self.bias)
-            self.log_loss = tf.losses.log_loss(labels=self.label, predictions=self.ans)
-            self.loss = self.log_loss# + 0.001 * self.l2_loss
+            self.log_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.labels,
+                                                                                      logits=self.result))
+            self.loss = self.log_loss + 0.001 * self.l2_loss
 
         with tf.name_scope("accuracy"):
-            self.predict = tf.rint(self.ans)
-            self.tmp_sim = tf.equal(tf.cast(self.predict, tf.int64), tf.cast(self.label, tf.int64))
+            self.predict = tf.argmax(self.logits, axis=1)
+            self.tmp_sim = tf.equal(self.predict, tf.argmax(self.labels, axis=1))
             self.accuracy = tf.reduce_mean(tf.cast(self.tmp_sim, tf.float32))
 
     @staticmethod
@@ -141,10 +145,10 @@ class Cnn(object):
         return accuracy
 
 
-# cnn = Cnn(sequence_length=35,
-#           vocab_size=1000,
-#           embedding_size=50,
-#           filter_sizes=[1, 2, 3, 4, 5],
-#           num_filters=20,
-#           batch_size=101)
+cnn = Cnn(sequence_length=35,
+          vocab_size=1000,
+          embedding_size=50,
+          filter_sizes=[1, 2, 3, 4, 5],
+          num_filters=20,
+          batch_size=101)
 

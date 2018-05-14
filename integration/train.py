@@ -54,13 +54,14 @@ class siamese_network_cnn(object):
     def __init__(self):
         # 定义CNN网络，对话窗口以及optimizer
         self.sess = tf.Session()
-        self.Model = Model(sequence_length=50,
+        self.Model = Model(sequence_length=70,
                            vocab_size=73300,
-                           embedding_size=100,
+                           embedding_size=200,
                            filter_sizes=[1, 2, 3, 4, 5, 6],
                            num_filters=100,
                            num_layers=1,
-                           rnn_size=100)
+                           rnn_size=150
+                     )
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
         self.optimizer = tf.train.AdamOptimizer(0.001).minimize(self.Model.loss, global_step=self.global_step)
         self.sess.run(tf.global_variables_initializer())
@@ -140,6 +141,7 @@ class siamese_network_cnn(object):
             self.Model.input_sentence_b: b_batch,
             self.Model.outer_feature: outer_feature,
             self.Model.dropout_keep_prob: 1.0,
+            self.Model.lstm_keep_prob: 0.8,
             self.Model.label: label
         }
         _, summary, step, log_loss, loss, accuracy = self.sess.run(
@@ -166,6 +168,7 @@ class siamese_network_cnn(object):
             self.Model.input_sentence_b: b_batch,
             self.Model.outer_feature: outer_feature,
             self.Model.dropout_keep_prob: 1.0,
+            self.Model.lstm_keep_prob: 1.0,
             self.Model.label: label
         }
         log_loss, summary, step, acc, predict = self.sess.run(

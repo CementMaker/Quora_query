@@ -9,7 +9,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 
 class Model(object):
-    def BiRNN(self, x, nscope, vscope, embedding_size, rnn_size, sequence_length, num_layer):
+    def BiRNN(self, x, scope, embedding_size, rnn_size, sequence_length, num_layer, output_keep_prob):
         '''
         :param x: 双向lstm的输入
         :param nscope: namespace scope
@@ -21,28 +21,28 @@ class Model(object):
         :return: 返回最后一个输出
         '''
         n_input, n_steps, n_hidden, n_layers = embedding_size, sequence_length, rnn_size, num_layer
-        with tf.name_scope("fw" + nscope), tf.variable_scope("fw" + vscope):
+        with tf.name_scope("fw" + scope), tf.variable_scope("fw" + scope):
             stacked_rnn_fw = []
             for _ in range(n_layers):
                 fw_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden)
-                # stm_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=1)
-                stacked_rnn_fw.append(fw_cell)
+                stm_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=output_keep_prob)
+                stacked_rnn_fw.append(stm_cell)
             lstm_fw_cell_m = tf.nn.rnn_cell.MultiRNNCell(cells=stacked_rnn_fw, state_is_tuple=True)
 
-        with tf.name_scope("bw" + nscope), tf.variable_scope("bw" + vscope):
+        with tf.name_scope("bw" + scope), tf.variable_scope("bw" + scope):
             stacked_rnn_bw = []
             for _ in range(n_layers):
                 bw_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden)
-                # stm_cell = tf.contrib.rnn.DropoutWrapper(bw_cell, output_keep_prob=1)
-                stacked_rnn_bw.append(bw_cell)
+                stm_cell = tf.contrib.rnn.DropoutWrapper(bw_cell, output_keep_prob=output_keep_prob)
+                stacked_rnn_bw.append(stm_cell)
             lstm_bw_cell_m = tf.nn.rnn_cell.MultiRNNCell(cells=stacked_rnn_bw, state_is_tuple=True)
 
-        with tf.name_scope("bw" + nscope), tf.variable_scope("bw" + vscope):
+        with tf.name_scope("bw" + scope), tf.variable_scope("bw" + scope):
             outputs, _, _ = rnn.static_bidirectional_rnn(cell_fw=lstm_fw_cell_m,
                                                          cell_bw=lstm_bw_cell_m,
                                                          inputs=x,
                                                          dtype=tf.float32,
-                                                         scope=nscope)
+                                                         scope=scope)
         return outputs[-1]
 
     def lstm(self, input, rnn_size, num_layers, scope):
@@ -67,13 +67,20 @@ class Model(object):
         tmp2 = (1 - y) * tf.square(tf.maximum((1 - d), 0))
         return tf.reduce_sum(tmp + tmp2) / batch_size / 2
 
-    def __init__(self, sequence_length, vocab_size, embedding_size, filter_sizes, num_filters, num_layers, rnn_size):
+    def __init__(self,
+                 sequence_length,
+                 vocab_size,
+                 embedding_size,
+                 filter_sizes,
+                 num_filters,
+                 num_layers,
+                 rnn_size):
         self.label = tf.placeholder(tf.float32, [None, ], name="label")
-        self.outer_feature = tf.placeholder(tf.float32, [None, 17], name="outer_feature")
+        self.outer_feature = tf.placeholder(tf.float32, [None, 20], name="outer_feature")
         self.input_sentence_a = tf.placeholder(tf.int32, [None, sequence_length], name="input_a")
         self.input_sentence_b = tf.placeholder(tf.int32, [None, sequence_length], name="input_b")
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
-        self.l2_loss = 0
+        self.lstm_keep_prob = tf.placeholder(tf.float32, name="lstm_keep_prob")
 
         with tf.name_scope("embedding_layer"):
             self.W = tf.Variable(tf.truncated_normal(shape=[vocab_size, embedding_size],
@@ -107,8 +114,20 @@ class Model(object):
 
         with tf.name_scope("output"):
             # 双向lstm，共享权重
-            self.out1 = self.BiRNN(self.inputs_a, "a", "a", embedding_size, rnn_size, sequence_length, num_layers)
-            self.out2 = self.BiRNN(self.inputs_b, "b", "b", embedding_size, rnn_size, sequence_length, num_layers)
+            self.out1 = self.BiRNN(x=self.inputs_a,
+                                   scope="a",
+                                   embedding_size=embedding_size,
+                                   rnn_size=rnn_size,
+                                   sequence_length=sequence_length,
+                                   num_layer=num_layers,
+                                   output_keep_prob=self.lstm_keep_prob)
+            self.out2 = self.BiRNN(x=self.inputs_b,
+                                   scope="b",
+                                   embedding_size=embedding_size,
+                                   rnn_size=rnn_size,
+                                   sequence_length=sequence_length,
+                                   num_layer=num_layers,
+                                   output_keep_prob=self.lstm_keep_prob)
 
         with tf.name_scope("result"):
             self.h_pool_a = tf.concat(pooled_outputs_a, 3)
@@ -129,7 +148,7 @@ class Model(object):
             )
             self.feature_drop = tf.nn.dropout(self.feature, keep_prob=self.dropout_keep_prob)
             self.weight = tf.Variable(tf.truncated_normal(
-                shape=[rnn_size * 8 + num_filters * len(filter_sizes) * 4 + 17, 1],
+                shape=[rnn_size * 8 + num_filters * len(filter_sizes) * 4 + 20, 1],
                 stddev=0.1,
                 mean=0.0)
             )
@@ -142,9 +161,12 @@ class Model(object):
             # log_loss
             # tf.nn.softmax_cross_entropy_with_logits:
             #   先计算logits的softmax函数值，如果Logits就是一个概率分布，会带来loss并不是实际loss的问题
-            self.l2_loss = self.l2_loss + tf.nn.l2_loss(self.weight) + tf.nn.l2_loss(self.bias)
+
+            keys = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+            self.l2_loss = tf.contrib.layers.l2_regularizer(0.0002)
+            self.l2_loss = tf.contrib.layers.apply_regularization(self.l2_loss, weights_list=keys)
             self.log_loss = tf.losses.log_loss(labels=self.label, predictions=self.ans)
-            self.loss = self.log_loss  # + 0.001 * self.l2_loss
+            self.loss = self.log_loss + self.l2_loss
 
         with tf.name_scope("accuracy"):
             self.predict = tf.rint(self.ans)
@@ -156,6 +178,11 @@ class Model(object):
                   self.lstm_diff, self.lstm_mul, self.out1, self.out2]
         for index in values:
             print(index)
+
+        print("*****************************************************")
+        keys = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        for key in keys:
+            print(key.name)
 
 
     @staticmethod
@@ -219,7 +246,7 @@ class Model(object):
         accuracy = tf.reduce_sum(tf.cast(correct_predictions, dtype=tf.float32))
         return accuracy
 
-
+#
 # cnn = Model(sequence_length=35,
 #             vocab_size=1000,
 #             embedding_size=50,

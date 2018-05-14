@@ -5,11 +5,16 @@ import sys
 
 from cnn import *
 sys.path.append("../")
+
+
 from PreProcess import *
 from extral_features import *
 from sklearn.metrics import log_loss
 from sklearn.metrics import classification_report
 from sklearn.model_selection import KFold, cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 
 
 import matplotlib.pyplot as plt
@@ -57,14 +62,14 @@ class siamese_network_cnn(object):
     def __init__(self):
         # 定义CNN网络，对话窗口以及optimizer
         self.sess = tf.Session()
-        self.cnn = Cnn(sequence_length=50,
+        self.cnn = Cnn(sequence_length=70,
                        vocab_size=73300,
                        embedding_size=50,
                        filter_sizes=[1, 2, 3, 4, 5, 6],
                        num_filters=50,
-                       batch_size=1500)
+                       batch_size=1000)
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        self.optimizer = tf.train.AdamOptimizer(0.0001).minimize(self.cnn.loss, global_step=self.global_step)
+        self.optimizer = tf.train.AdamOptimizer(0.008).minimize(self.cnn.loss, global_step=self.global_step)
         self.sess.run(tf.global_variables_initializer())
 
         # 训练数据测试数据的获取，但是好像有点问题
@@ -98,16 +103,9 @@ class siamese_network_cnn(object):
         print("*****************************************************************************")
 
         # 获取训练数据迭代器并且获取测试数据（用于神经网络验证）
-        self.batches = data.get_batch(7, 1000, self.train_data, self.train_feature, self.train_label)
-        data_double, label_double, feature_double = [], [], []
-        for (d, l, f) in zip(self.test_data, self.test_label, self.test_feature):
-            if l == 0 and random.random() <= 0.5667:
-                data_double.append(d)
-                label_double.append(l)
-                feature_double.append(f)
-        self.test_data = np.append(self.test_data, data_double, axis=0)
-        self.test_label = np.append(self.test_label, label_double)
-        self.test_feature = np.append(self.test_feature, feature_double, axis=0)
+        print("*****************手工特征工程的shape***********************************")
+        print(self.train_feature.shape, self.test_feature.shape)
+        print("*****************手工特征工程的shape***********************************")
         self.test_a, self.test_b, self.y_test = function.dev_data(self.test_data, self.test_label)
 
         # 获取test数据
@@ -129,7 +127,7 @@ class siamese_network_cnn(object):
         self.summary_writer_train = tf.summary.FileWriter("../summary/train", graph=self.sess.graph)
         self.summary_writer_test = tf.summary.FileWriter("../summary/test", graph=self.sess.graph)
 
-    def train_step(self, a_batch, b_batch, outer_feature, label):
+    def train_step(self, a_batch, b_batch, label):
         '''
         神经网路的训练过程
         :param a_batch: Siamese网络左边的输入
@@ -137,23 +135,25 @@ class siamese_network_cnn(object):
         :param label: 标签
         :return: 训练网络，没有返回值
         '''
+
         feed_dict = {
             self.cnn.input_sentence_a: a_batch,
             self.cnn.input_sentence_b: b_batch,
-            self.cnn.outer_feature: outer_feature,
             self.cnn.dropout_keep_prob: 0.5,
             self.cnn.label: label
         }
-        _, summary, step, log_loss, loss, accuracy = self.sess.run(
-            [self.optimizer, self.merged_summary_op_train, self.global_step, self.cnn.log_loss, self.cnn.loss, self.cnn.accuracy],
+        _, summary, step, log_loss, loss, accuracy, feature = self.sess.run(
+            fetches=[self.optimizer, self.merged_summary_op_train, self.global_step,
+                     self.cnn.log_loss, self.cnn.loss, self.cnn.accuracy, self.cnn.logits],
             feed_dict=feed_dict)
         self.summary_writer_train.add_summary(summary, step)
         time_str = datetime.datetime.now().isoformat()
         print("{}: step {}, loss {:g}, log_loss {:g} accuracy {}".format(time_str, step, loss, log_loss, accuracy))
         self.train_loss.append(loss)
         self.train_accuracy.append(accuracy)
+        return feature
 
-    def dev_step(self, a_batch, b_batch, outer_feature, label):
+    def dev_step(self, a_batch, b_batch, label):
         '''
         神经网路的验证过程，查看网络是否收敛
         :param a_batch: Siamese网络左边的输入
@@ -161,16 +161,15 @@ class siamese_network_cnn(object):
         :param label: 标签
         :return: 验证网络，没有返回值
         '''
-
         feed_dict = {
             self.cnn.input_sentence_a: a_batch,
             self.cnn.input_sentence_b: b_batch,
-            self.cnn.outer_feature: outer_feature,
             self.cnn.dropout_keep_prob: 1.0,
             self.cnn.label: label
         }
-        log_loss, summary, step, acc, predict = self.sess.run(
-            fetches=[self.cnn.log_loss, self.merged_summary_op_test, self.global_step, self.cnn.accuracy, self.cnn.predict],
+        log_loss, summary, step, acc, predict, feature = self.sess.run(
+            fetches=[self.cnn.log_loss, self.merged_summary_op_test, self.global_step,
+                     self.cnn.accuracy, self.cnn.predict, self.cnn.logits],
             feed_dict=feed_dict
         )
         self.summary_writer_test.add_summary(summary, step)
@@ -178,6 +177,18 @@ class siamese_network_cnn(object):
         print("\n**********\tlog_loss：", log_loss, "**********\n")
         self.test_loss.append(log_loss)
         self.test_accuracy.append(acc)
+        return feature
+
+    # @staticmethod
+    # def get_batch(epoches, batch_size, data, label):
+    #     data = list(zip(data, label))
+    #     for epoch in range(epoches):
+    #         random.shuffle(data)
+    #         for batch in range(0, len(data), batch_size):
+    #             if batch + batch_size >= len(data):
+    #                 yield data[batch: len(data)]
+    #             else:
+    #                 yield data[batch: (batch + batch_size)]
 
     def draw_chart(self):
         '''
@@ -213,34 +224,54 @@ class siamese_network_cnn(object):
                           columns=[["test_id", "is_duplicate"]])
         df.to_csv("../test.csv", index=False)
 
-    def main(self, flag=False):
-        '''神经网络的入口，整个网络的运行过程'''
+    def main(self):
+        feature, label, feature_test = [], [], []
+        self.batches = self.get_batch(2, 1000, self.train_data, self.train_label)
         for batch in self.batches:
-            x, outer_feature, y = zip(*batch)
+            x, y = zip(*batch)
             batch_a = np.array([a for (a, b) in x])
             batch_b = np.array([b for (a, b) in x])
-            self.train_step(batch_a, batch_b, outer_feature, np.squeeze(y, axis=1))
-            current_step = tf.train.global_step(self.sess, self.global_step)
+            self.train_step(batch_a, batch_b, np.squeeze(y, axis=1))
 
+            current_step = tf.train.global_step(self.sess, self.global_step)
             if current_step % 50 == 0:
                 print("\nEvaluation:")
-                self.dev_step(self.test_a, self.test_b, self.test_feature, self.y_test)
-                print("")
-        self.draw_chart()
+                self.dev_step(self.test_a, self.test_b, self.y_test)
 
-        # 将测试集拿出来训练
-        # if flag is True:
-        #     self.batches = data.get_batch(7, 1500, zip(self.test_a, self.test_b), self.y_test)
-        #     for batch in self.batches:
-        #         x, y = zip(*batch)
-        #         batch_a = np.array([a for (a, b) in x])
-        #         batch_b = np.array([b for (a, b) in x])
-        #         self.train_step(batch_a, batch_b, np.squeeze(y, axis=1))
-        # self.predict()
+        feature_test = self.dev_step(self.test_a, self.test_b, self.y_test)
+        self.batches = self.get_batch(1, 1000, self.train_data, self.train_label)
+        for batch in self.batches:
+            x, y = zip(*batch)
+            batch_a = np.array([a for (a, b) in x])
+            batch_b = np.array([b for (a, b) in x])
 
+            if feature == []:
+                feature = self.dev_step(batch_a, batch_b, np.squeeze(y, axis=1))
+            else:
+                feature = np.vstack((feature, self.dev_step(batch_a, batch_b, np.squeeze(y, axis=1))))
+            label = np.concatenate((label, np.squeeze(y, axis=-1)), axis=0)
+
+        print(np.array(feature).shape, np.array(label).shape)
+        feature = np.concatenate((feature, self.train_feature), axis=1)
+        feature_test = np.concatenate((feature_test, self.test_feature), axis=1)
+        pickle.dump((feature, label, feature_test, self.y_test), open("temp.pkl", "wb"))
+
+        xgboostClassifier = xgb.XGBClassifier(colsample_bytree=0.4,
+                                              gamma=0.05,
+                                              learning_rate=0.16,
+                                              max_depth=6,
+                                              n_estimators=85,
+                                              reg_alpha=1.2,
+                                              subsample=1,
+                                              objective='binary:logistic',
+                                              silent=False,
+                                              nthread=8).fit(feature, label)
+        print("************************************* xgboostClassifier ************************************")
+        print(classification_report(y_true=self.y_test, y_pred=xgboostClassifier.predict(feature_test)))
+        print("************************************* xgboostClassifier ************************************")
         print("Run the command line:\n"
-              "--> tensorboard --logdir=summary"
-              "\nThen open http://0.0.0.0:6006/ into your web browser")
+              "--> tensorboard --logdir=summary\n"
+              "Then open http://0.0.0.0:6006/ into your web browser")
 
 
 if __name__ == '__main__':
